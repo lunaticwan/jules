@@ -11,9 +11,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
       manifest: {
-        name: 'Google Jules & GitHub Dashboard',
+        name: 'JulesPWA - Workspace',
         short_name: 'JulesPWA',
-        description: 'Google Jules Task Management & GitHub Dashboard Mobile PWA',
+        description: 'JulesPWA - Google Jules Task Management & GitHub Dashboard Workspace',
         theme_color: '#0f172a',
         background_color: '#0f172a',
         display: 'standalone',
