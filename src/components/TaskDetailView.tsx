@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ExternalLink, Send, CheckCircle2, Bot, User, Check, GitPullRequest, FileText, MessageSquare } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Send, CheckCircle2, Bot, User, Check, GitPullRequest, FileText, MessageSquare, GitBranch, Globe } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { ScrollArea } from './ui/ScrollArea';
 import { ChangedFilesView } from './ChangedFilesView';
 import { JulesSession, approveJulesPlan, sendJulesMessage } from '../services/julesApi';
+import { getRepoLinks } from '../services/githubApi';
 
 export interface TaskDetailViewProps {
   session: JulesSession;
@@ -24,6 +25,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isAwaitingApproval = session.state === 'AWAITING_APPROVAL';
+  const repoLinks = getRepoLinks(session.repository);
 
   const handleApprove = async () => {
     setIsSubmitting(true);
@@ -70,9 +72,27 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
             <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 line-clamp-1">
               {session.title || session.prompt}
             </h2>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              {session.repository} ({session.baseBranch})
-            </p>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+              <span>{session.repository} ({session.baseBranch})</span>
+              <a
+                href={repoLinks.repoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 transition-colors"
+                title="GitHub 바로가기"
+              >
+                <GitBranch className="h-3 w-3" />
+              </a>
+              <a
+                href={repoLinks.pagesUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="p-0.5 rounded hover:bg-slate-200 dark:hover:bg-slate-800 text-emerald-600 dark:text-emerald-400 transition-colors"
+                title="배포 페이지 바로가기"
+              >
+                <Globe className="h-3 w-3" />
+              </a>
+            </div>
           </div>
         </div>
 

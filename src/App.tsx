@@ -81,6 +81,7 @@ export default function App() {
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenNewTask={() => setIsNewTaskOpen(true)}
             onRefresh={loadSessions}
+            onSessionCreated={handleSessionCreated}
             isLoading={isLoading}
             isCompactView
           />
@@ -130,6 +131,7 @@ export default function App() {
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenNewTask={() => setIsNewTaskOpen(true)}
             onRefresh={loadSessions}
+            onSessionCreated={handleSessionCreated}
             isLoading={isLoading}
           />
         )}

@@ -29,3 +29,19 @@
 .safe-pt {
   padding-top: calc(0.5rem + env(safe-area-inset-top, 0px));
 }
+
+/* 세련된 얇은 스크롤바 모던 스타일 */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}

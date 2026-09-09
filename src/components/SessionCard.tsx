@@ -1,9 +1,10 @@
 import React from 'react';
-import { ExternalLink, CheckCircle2, Clock, AlertCircle, GitPullRequest } from 'lucide-react';
+import { ExternalLink, CheckCircle2, Clock, AlertCircle, GitPullRequest, GitBranch, Globe } from 'lucide-react';
 import { Card } from './ui/Card';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { JulesSession } from '../services/julesApi';
+import { getRepoLinks } from '../services/githubApi';
 
 export interface SessionCardProps {
   session: JulesSession;
@@ -19,6 +20,7 @@ export const SessionCard: React.FC<SessionCardProps> = ({
   onApprovePlan,
 }) => {
   const isAwaitingApproval = session.state === 'AWAITING_APPROVAL';
+  const repoLinks = getRepoLinks(session.repository);
 
   const getStatusBadge = () => {
     switch (session.state) {
@@ -66,11 +68,33 @@ export const SessionCard: React.FC<SessionCardProps> = ({
     >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-blue-400 bg-blue-950/60 px-2 py-0.5 rounded border border-blue-900">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs font-semibold text-blue-400 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-900/80 inline-flex items-center gap-1">
               {session.repository}
             </span>
-            <span className="text-[11px] text-slate-400">({session.baseBranch})</span>
+            <span className="text-[11px] text-slate-400 font-mono">({session.baseBranch})</span>
+
+            {/* 바로가기 링크 버튼군 */}
+            <div className="inline-flex items-center gap-1 ml-1" onClick={(e) => e.stopPropagation()}>
+              <a
+                href={repoLinks.repoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="p-1 rounded bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                title="GitHub 레포지토리 바로가기"
+              >
+                <GitBranch className="h-3.5 w-3.5" />
+              </a>
+              <a
+                href={repoLinks.pagesUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="p-1 rounded bg-slate-800/80 hover:bg-slate-700 text-emerald-400 hover:text-emerald-300 transition-colors"
+                title="배포 웹사이트 바로가기"
+              >
+                <Globe className="h-3.5 w-3.5" />
+              </a>
+            </div>
           </div>
           <h3 className="mt-1.5 text-sm font-semibold text-slate-100 line-clamp-2">
             {session.title || session.prompt}

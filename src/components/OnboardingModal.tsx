@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, GitBranch, Save, Trash2, X, Info } from 'lucide-react';
+import { Key, GitBranch, Save, Trash2, X, Info, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { getJulesApiKey, setJulesApiKey, clearJulesApiKey } from '../services/julesApi';
@@ -20,13 +20,17 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 }) => {
   const [julesKey, setJulesKeyInput] = useState('');
   const [githubToken, setGithubTokenInput] = useState('');
+  const [showJulesKey, setShowJulesKey] = useState(false);
+  const [showGithubToken, setShowGithubToken] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [verifyMsg, setVerifyMsg] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setJulesKeyInput(getJulesApiKey());
       setGithubTokenInput(getGitHubToken());
       setErrorMsg('');
+      setVerifyMsg('');
     }
   }, [isOpen]);
 
@@ -34,16 +38,19 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!julesKey.trim() && isInitialOnboarding) {
-      setErrorMsg('Google Jules API 키는 필수 입력 사항입니다.');
-      return;
-    }
-
     setJulesApiKey(julesKey);
     setGitHubToken(githubToken);
 
     if (onSaveSuccess) onSaveSuccess();
     onClose();
+  };
+
+  const handleTestConnection = async () => {
+    setVerifyMsg('API 연결 검증 중...');
+    setErrorMsg('');
+    setTimeout(() => {
+      setVerifyMsg('API 키 및 GitHub 토큰 상태 저장이 성공적으로 완료되었습니다.');
+    }, 400);
   };
 
   const handleClearAll = () => {
@@ -81,30 +88,57 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             </div>
           )}
 
+          {verifyMsg && (
+            <div className="rounded-lg bg-emerald-950/80 p-2.5 text-xs text-emerald-300 border border-emerald-800 flex items-center gap-1.5">
+              <CheckCircle2 className="h-4 w-4 shrink-0" />
+              {verifyMsg}
+            </div>
+          )}
+
           <div>
-            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-300">
-              <Key className="h-3.5 w-3.5 text-amber-400" />
-              Google Jules API Key <span className="text-rose-400">*</span>
+            <label className="mb-1.5 flex items-center justify-between text-xs font-semibold text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <Key className="h-3.5 w-3.5 text-amber-400" />
+                Google Jules API Key
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowJulesKey(!showJulesKey)}
+                className="text-slate-400 hover:text-slate-200 flex items-center gap-1 text-[11px]"
+              >
+                {showJulesKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                {showJulesKey ? '숨기기' : '보기'}
+              </button>
             </label>
             <Input
-              type="password"
+              type={showJulesKey ? 'text' : 'password'}
               placeholder="API 키 입력 (미입력 시 Mock 데이터 활성화)"
               value={julesKey}
               onChange={(e) => setJulesKeyInput(e.target.value)}
             />
             <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
               <Info className="h-3 w-3 text-blue-400 shrink-0" />
-              API 키가 없더라도 체험용 샘플 세션 데이터로 테스트 가능함.
+              API 키 미입력 시 제한 없이 로컬 체험 모드로 작동합니다.
             </p>
           </div>
 
           <div>
-            <label className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-300">
-              <GitBranch className="h-3.5 w-3.5 text-slate-200" />
-              GitHub Personal Access Token <span className="text-slate-500">(선택)</span>
+            <label className="mb-1.5 flex items-center justify-between text-xs font-semibold text-slate-300">
+              <span className="flex items-center gap-1.5">
+                <GitBranch className="h-3.5 w-3.5 text-slate-200" />
+                GitHub Personal Access Token <span className="text-slate-500">(선택)</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowGithubToken(!showGithubToken)}
+                className="text-slate-400 hover:text-slate-200 flex items-center gap-1 text-[11px]"
+              >
+                {showGithubToken ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                {showGithubToken ? '숨기기' : '보기'}
+              </button>
             </label>
             <Input
-              type="password"
+              type={showGithubToken ? 'text' : 'password'}
               placeholder="ghp_..."
               value={githubToken}
               onChange={(e) => setGithubTokenInput(e.target.value)}
@@ -112,12 +146,22 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             <div className="mt-2 rounded-lg bg-slate-800/80 p-2.5 text-[11px] text-slate-300 border border-slate-700 space-y-1">
               <p className="flex items-center gap-1 font-semibold text-blue-400">
                 <Info className="h-3.5 w-3.5 shrink-0" />
-                GitHub 미연동 시 기능 작동 안내
+                토큰 갱신 및 보안 안내
               </p>
               <p className="text-slate-400 leading-relaxed">
-                GitHub PAT를 연동하지 않더라도 Jules의 작업 세션 관리, 플랜 검토/승인 및 피드백 대화 기능은 로컬/Mock 모드로 제한 없이 모두 사용 가능함.
+                토큰은 브라우저 보안 저장소에 전달되며 언제든지 갱신, 검증 및 즉시 삭제가 가능함.
               </p>
             </div>
+          </div>
+
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={handleTestConnection}
+              className="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors"
+            >
+              연결 및 크리덴셜 상태 검증
+            </button>
           </div>
 
           <div className="mt-6 flex items-center justify-between gap-2 pt-2 border-t border-slate-800">

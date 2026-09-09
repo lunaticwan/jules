@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Settings, Plus, RefreshCw, Terminal, Clock, AlertCircle, CheckCircle2, Search, Moon, Sun, BarChart2, Layers } from 'lucide-react';
+import { Settings, Plus, RefreshCw, Terminal, Clock, AlertCircle, CheckCircle2, Search, Moon, Sun, BarChart2, Layers, GitBranch, Globe } from 'lucide-react';
 import { Tabs } from './ui/Tabs';
 import { SessionCard } from './SessionCard';
 import { AnalyticsView } from './AnalyticsView';
 import { JulesSession } from '../services/julesApi';
-import { getGitHubToken } from '../services/githubApi';
+import { getGitHubToken, getRepoLinks } from '../services/githubApi';
 import { useTheme } from '../context/ThemeContext';
 
 export interface DashboardViewProps {
@@ -17,6 +17,7 @@ export interface DashboardViewProps {
   onOpenSettings: () => void;
   onOpenNewTask: () => void;
   onRefresh: () => void;
+  onSessionCreated?: (session: JulesSession) => void;
   isLoading?: boolean;
   isCompactView?: boolean;
 }
@@ -31,6 +32,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenSettings,
   onOpenNewTask,
   onRefresh,
+  onSessionCreated,
   isLoading,
 }) => {
   const { theme, toggleTheme } = useTheme();
@@ -80,7 +82,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h1 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-none">Jules & GitHub</h1>
+              <h1 className="text-base font-bold text-slate-900 dark:text-slate-100 leading-none">JulesPWA</h1>
               {githubToken ? (
                 <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60">
                   GitHub 연동됨
@@ -91,7 +93,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Mobile Task Dashboard</p>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Workspace & Task Management</p>
           </div>
         </div>
 
@@ -148,7 +150,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {mainViewMode === 'analytics' ? (
-        <AnalyticsView sessions={sessions} />
+        <AnalyticsView sessions={sessions} onSessionCreated={onSessionCreated} />
       ) : (
         <>
           {/* Main Stats Summary */}
@@ -221,9 +223,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          {/* Repository Filter Tabs */}
-          <div className="px-4 pb-2">
+          {/* Repository Filter Tabs & Selected Repo Quick Links */}
+          <div className="px-4 pb-2 space-y-2">
             <Tabs items={repoTabs} activeId={selectedRepo} onChange={onRepoSelect} />
+            {selectedRepo !== 'ALL' && (
+              <div className="flex items-center justify-between text-xs bg-slate-100 dark:bg-slate-800/60 p-2 rounded-xl border border-slate-200 dark:border-slate-700/60">
+                <span className="font-semibold text-slate-700 dark:text-slate-300 truncate max-w-[200px]">
+                  선택 레포: {selectedRepo}
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <a
+                    href={getRepoLinks(selectedRepo).repoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                  >
+                    <GitBranch className="h-3.5 w-3.5" />
+                    GitHub
+                  </a>
+                  <span className="text-slate-400">|</span>
+                  <a
+                    href={getRepoLinks(selectedRepo).pagesUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    페이지 바로가기
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Session Card List */}

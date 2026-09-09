@@ -1,19 +1,50 @@
-import React from 'react';
-import { Sparkles, TrendingUp, Zap, ShieldCheck, Cpu, Code2, BarChart2 } from 'lucide-react';
-import { JulesSession } from '../services/julesApi';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, TrendingUp, Zap, Code2, Globe, CheckCircle2, Play } from 'lucide-react';
+import { JulesSession, triggerQuickAiAction } from '../services/julesApi';
+import { fetchRepoDeploymentStatus, RepoDeploymentHealth } from '../services/githubApi';
 
 interface AnalyticsViewProps {
   sessions: JulesSession[];
+  onSessionCreated?: (session: JulesSession) => void;
 }
 
 /**
  * Jules API 세션 데이터 + 로컬 성능/생산성 매트릭을 조합한 창의적 분석 인사이트 컴포넌트
  */
-export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions }) => {
+export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessionCreated }) => {
   const total = sessions.length;
+  const [healthData, setHealthData] = useState<RepoDeploymentHealth[]>([]);
+  const [isExecutingAction, setIsExecutingAction] = useState<string | null>(null);
+
+  // 저장소 목록 추출
+  const repos = Array.from(new Set(sessions.map((s) => s.repository)));
+
+  useEffect(() => {
+    const loadHealth = async () => {
+      const results = await Promise.all(
+        repos.map((r) => fetchRepoDeploymentStatus(r))
+      );
+      setHealthData(results);
+    };
+    if (repos.length > 0) {
+      loadHealth();
+    }
+  }, [sessions]);
+
+  const handleQuickAction = async (repo: string, type: 'lint' | 'security' | 'perf' | 'test') => {
+    setIsExecutingAction(`${repo}-${type}`);
+    try {
+      const newSession = await triggerQuickAiAction(repo, type);
+      if (onSessionCreated) {
+        onSessionCreated(newSession);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsExecutingAction(null);
+    }
+  };
   const completed = sessions.filter((s) => s.state === 'COMPLETED').length;
-  const inProgress = sessions.filter((s) => s.state === 'IN_PROGRESS').length;
-  const awaiting = sessions.filter((s) => s.state === 'AWAITING_APPROVAL').length;
 
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -61,33 +92,78 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions }) => {
         </div>
       </div>
 
-      {/* AI 창의적 제안 카드 목록 */}
+      {/* 1-Click AI 스마트 작업 제안 창조 */}
+      <div className="rounded-2xl border border-indigo-200 dark:border-indigo-900/60 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/30 dark:to-purple-950/30 p-4 space-y-3">
+        <h4 className="text-xs font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+          <Zap className="h-4 w-4 text-indigo-500" />
+          1-Click AI 스마트 작업 자동 발주
+        </h4>
+        <p className="text-[11px] text-slate-600 dark:text-slate-400">
+          GitHub 레포지토리를 직접 분석하여 즉시 실행 가능한 최적화 작업 세션을 1-Click으로 생성합니다.
+        </p>
+
+        <div className="grid grid-cols-2 gap-2 pt-1">
+          <button
+            disabled={!!isExecutingAction || repos.length === 0}
+            onClick={() => handleQuickAction(repos[0] || 'acme/mobile-pwa', 'perf')}
+            className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-800/90 border border-indigo-100 dark:border-indigo-800/60 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all text-left group"
+          >
+            <div>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-500">번들 최적화</p>
+              <p className="text-[10px] text-slate-500">PWA 로딩 속도 향상</p>
+            </div>
+            <Play className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+          </button>
+
+          <button
+            disabled={!!isExecutingAction || repos.length === 0}
+            onClick={() => handleQuickAction(repos[0] || 'acme/mobile-pwa', 'security')}
+            className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-800/90 border border-indigo-100 dark:border-indigo-800/60 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all text-left group"
+          >
+            <div>
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-500">보안 스캔</p>
+              <p className="text-[10px] text-slate-500">의존성 패키지 점검</p>
+            </div>
+            <Play className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+          </button>
+        </div>
+      </div>
+
+      {/* GitHub Pages 실시간 배포 헬스 모니터링 */}
       <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
         <h4 className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-          <BarChart2 className="h-4 w-4 text-blue-500" />
-          스마트 자동화 및 리팩토링 제안
+          <Globe className="h-4 w-4 text-emerald-500" />
+          GitHub Pages 배포 라이브 헬스
         </h4>
 
-        <div className="space-y-2 text-xs">
-          <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
-            <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">온디맨드 캐싱 성능 이점</p>
-              <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
-                변경 파일을 일괄 페치하지 않고 필요시 지연 로딩함으로써 세션 로딩 속도가 기존 대비 약 80% 향상되었습니다.
-              </p>
-            </div>
-          </div>
+        <div className="space-y-2 pt-1">
+          {healthData.length === 0 ? (
+            <p className="text-xs text-slate-500">배포 정보 로딩 중...</p>
+          ) : (
+            healthData.map((health) => (
+              <div
+                key={health.repo}
+                className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60 text-xs"
+              >
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <div>
+                    <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">{health.repo}</p>
+                    <p className="text-[10px] text-slate-500">상태: 정상 배포됨 (GitHub Pages)</p>
+                  </div>
+                </div>
 
-          <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/60">
-            <Cpu className="h-4 w-4 text-purple-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">추천 자동화 태스크</p>
-              <p className="text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">
-                승인 대기 중인 세션 ({awaiting}개) 및 진행 중 세션 ({inProgress}개)이 있습니다. 빠르게 검토해보세요.
-              </p>
-            </div>
-          </div>
+                <a
+                  href={health.deploymentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] hover:bg-emerald-200 dark:hover:bg-emerald-900 transition-colors"
+                >
+                  페이지 열기
+                </a>
+              </div>
+            ))
+          )}
         </div>
       </div>
 

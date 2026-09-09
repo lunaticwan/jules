@@ -333,6 +333,24 @@ export async function approveJulesPlan(sessionId: string): Promise<JulesSession>
 /**
  * 메시지 전송 / 수정 요청
  */
+/**
+ * 스마트 1-Click AI 액션 제안 생성 및 세션 자동 발주
+ */
+export async function triggerQuickAiAction(repo: string, actionType: 'lint' | 'security' | 'perf' | 'test'): Promise<JulesSession> {
+  const promptMap = {
+    lint: '전체 코드베이스 ESLint/TypeScript 타입 체크 규칙 정형화 및 경고 수정을 위한 리팩토링 진행',
+    security: '의존성 패키지 취약점 점검 및 보안 강화 업데이트 적용',
+    perf: '웹 성능 번들 사이즈 최적화 및 로딩 속도 개선 작업 수행',
+    test: '주요 서비스 및 유틸리티 함수에 대한 단위 테스트 케이스 자동 생성',
+  };
+
+  return createJulesSession({
+    repository: repo,
+    baseBranch: 'main',
+    prompt: promptMap[actionType],
+  });
+}
+
 export async function sendJulesMessage(sessionId: string, message: string): Promise<JulesSession> {
   const sessions = getStoredSessions();
   const idx = sessions.findIndex((s) => s.id === sessionId || s.name === sessionId);
