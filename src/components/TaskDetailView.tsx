@@ -18,14 +18,37 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   session,
   onBack,
   onUpdateSession,
-  isSplitView = false,
 }) => {
   const [activeTab, setActiveTab] = useState<'timeline' | 'files'>('timeline');
   const [inputMsg, setInputMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ESC 키 눌렀을 때 세션 상세 닫기/뒤로가기
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onBack();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onBack]);
+
+  if (!session) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-6 text-slate-400">
+        <p className="text-sm">선택된 세션 정보를 찾을 수 없습니다.</p>
+        <button onClick={onBack} className="mt-3 px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg">
+          목록으로 돌아가기
+        </button>
+      </div>
+    );
+  }
+
   const isAwaitingApproval = session.state === 'AWAITING_APPROVAL';
-  const repoLinks = getRepoLinks(session.repository);
+  const repoLinks = getRepoLinks(session.repository || 'owner/repo');
+  const messages = Array.isArray(session.messages) ? session.messages : [];
+  const planSteps = Array.isArray(session.plan) ? session.plan : [];
 
   const handleApprove = async () => {
     setIsSubmitting(true);
@@ -60,20 +83,20 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
       {/* Header */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/90 dark:bg-slate-900/90 px-4 py-3 backdrop-blur-md safe-pt shrink-0">
         <div className="flex items-center gap-3">
-          {!isSplitView && (
-            <button
-              onClick={onBack}
-              className="rounded-lg p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-          )}
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            title="목록으로 돌아가기 (ESC)"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>닫기</span>
+          </button>
           <div>
             <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 line-clamp-1">
-              {session.title || session.prompt}
+              {session.title || session.prompt || 'Untitled Session'}
             </h2>
             <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-              <span>{session.repository} ({session.baseBranch})</span>
+              <span>{session.repository} ({session.baseBranch || 'main'})</span>
               <a
                 href={repoLinks.repoUrl}
                 target="_blank"
@@ -142,13 +165,13 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
         {activeTab === 'timeline' ? (
           <>
             {/* Task Plan Steps */}
-            {session.plan && session.plan.length > 0 && (
+            {planSteps.length > 0 && (
               <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800/40 p-3.5 space-y-2 shadow-sm">
                 <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
                   실행 플랜 단계
                 </h3>
                 <div className="space-y-2 pt-1">
-                  {session.plan.map((step) => (
+                  {planSteps.map((step) => (
                     <div
                       key={step.index}
                       className="flex items-center gap-2 text-xs text-slate-800 dark:text-slate-200 bg-slate-50 dark:bg-slate-900/50 p-2 rounded border border-slate-200 dark:border-slate-800"
@@ -171,40 +194,46 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
 
             {/* Timeline Messages */}
             <div className="space-y-3 pt-2">
-              {session.messages.map((msg) => {
-                const isUser = msg.sender === 'user';
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex gap-2.5 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
-                  >
+              {messages.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-500">
+                  타임라인 메시지가 없습니다.
+                </div>
+              ) : (
+                messages.map((msg) => {
+                  const isUser = msg.sender === 'user';
+                  return (
                     <div
-                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                        isUser ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
-                      }`}
+                      key={msg.id || `msg-${Math.random()}`}
+                      className={`flex gap-2.5 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
                     >
-                      {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
-                    </div>
+                      <div
+                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                          isUser ? 'bg-blue-600 text-white' : 'bg-purple-600 text-white'
+                        }`}
+                      >
+                        {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                      </div>
 
-                    <div
-                      className={`max-w-[82%] rounded-2xl p-3 text-xs leading-relaxed ${
-                        isUser
-                          ? 'bg-blue-600 text-white rounded-tr-none'
-                          : msg.type === 'thought'
-                          ? 'bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60 rounded-tl-none italic'
-                          : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700/60 rounded-tl-none shadow-sm'
-                      }`}
-                    >
-                      {msg.type === 'thought' && (
-                        <div className="mb-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider not-italic">
-                          Thought Process
-                        </div>
-                      )}
-                      {msg.content}
+                      <div
+                        className={`max-w-[82%] rounded-2xl p-3 text-xs leading-relaxed ${
+                          isUser
+                            ? 'bg-blue-600 text-white rounded-tr-none'
+                            : msg.type === 'thought'
+                            ? 'bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60 rounded-tl-none italic'
+                            : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700/60 rounded-tl-none shadow-sm'
+                        }`}
+                      >
+                        {msg.type === 'thought' && (
+                          <div className="mb-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider not-italic">
+                            Thought Process
+                          </div>
+                        )}
+                        {msg.content}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </>
         ) : (
