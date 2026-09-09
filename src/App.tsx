@@ -25,11 +25,49 @@ export default function App() {
     try {
       const list = await fetchJulesSessions();
       setSessions(list);
+      return list;
     } catch (err) {
       console.error(err);
+      return [];
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // URL Query / Hash 파라미터 기반 라우트 상태 읽기 및 동기화
+  const syncRouteFromUrl = (sessionList: JulesSession[]) => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionParam = params.get('session');
+    const repoParam = params.get('repo');
+
+    if (repoParam) {
+      setSelectedRepo(repoParam);
+    }
+
+    if (sessionParam) {
+      const found = sessionList.find((s) => s.id === sessionParam || s.name === sessionParam);
+      if (found) {
+        setSelectedSession(found);
+      }
+    }
+  };
+
+  // URL 파라미터 업데이트 함수 (pushState 활용)
+  const updateUrlParams = (sessionId: string | null, repoId: string) => {
+    const url = new URL(window.location.href);
+    if (sessionId) {
+      url.searchParams.set('session', sessionId);
+    } else {
+      url.searchParams.delete('session');
+    }
+
+    if (repoId && repoId !== 'ALL') {
+      url.searchParams.set('repo', repoId);
+    } else {
+      url.searchParams.delete('repo');
+    }
+
+    window.history.pushState({}, '', url.toString());
   };
 
   useEffect(() => {
@@ -38,8 +76,42 @@ export default function App() {
       setIsInitialOnboarding(true);
       setIsSettingsOpen(true);
     }
-    loadSessions();
+
+    loadSessions().then((list) => {
+      syncRouteFromUrl(list);
+    });
+
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const sessionParam = params.get('session');
+      const repoParam = params.get('repo');
+
+      setSelectedRepo(repoParam || 'ALL');
+
+      if (sessionParam) {
+        setSessions((currentSessions) => {
+          const found = currentSessions.find((s) => s.id === sessionParam || s.name === sessionParam);
+          setSelectedSession(found || null);
+          return currentSessions;
+        });
+      } else {
+        setSelectedSession(null);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  const handleSelectSession = (session: JulesSession | null) => {
+    setSelectedSession(session);
+    updateUrlParams(session ? session.id : null, selectedRepo);
+  };
+
+  const handleRepoSelect = (repo: string) => {
+    setSelectedRepo(repo);
+    updateUrlParams(selectedSession ? selectedSession.id : null, repo);
+  };
 
   const handleApprovePlan = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -56,7 +128,7 @@ export default function App() {
 
   const handleSessionCreated = (newSession: JulesSession) => {
     setSessions((prev) => [newSession, ...prev]);
-    setSelectedSession(newSession);
+    handleSelectSession(newSession);
   };
 
   const handleUpdateSession = (updated: JulesSession) => {
@@ -76,8 +148,8 @@ export default function App() {
             sessions={sessions}
             selectedRepo={selectedRepo}
             selectedSessionId={selectedSession ? (selectedSession as JulesSession).id : undefined}
-            onRepoSelect={setSelectedRepo}
-            onSelectSession={setSelectedSession}
+            onRepoSelect={handleRepoSelect}
+            onSelectSession={handleSelectSession}
             onApprovePlan={handleApprovePlan}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenNewTask={() => setIsNewTaskOpen(true)}
@@ -91,10 +163,10 @@ export default function App() {
         {/* Right Side: Task Detail View or Empty Selection Placeholder */}
         <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden">
           {selectedSession ? (
-            <ErrorBoundary onReset={() => setSelectedSession(null)}>
+            <ErrorBoundary onReset={() => handleSelectSession(null)}>
               <TaskDetailView
                 session={selectedSession}
-                onBack={() => setSelectedSession(null)}
+                onBack={() => handleSelectSession(null)}
                 onUpdateSession={handleUpdateSession}
                 isSplitView
               />
@@ -118,10 +190,10 @@ export default function App() {
       {/* 모바일 (갤럭시 폴드5 접힘 포함, md 미만) Single Column View */}
       <div className="block md:hidden min-h-screen bg-slate-900 max-w-md mx-auto shadow-2xl">
         {selectedSession ? (
-          <ErrorBoundary onReset={() => setSelectedSession(null)}>
+          <ErrorBoundary onReset={() => handleSelectSession(null)}>
             <TaskDetailView
               session={selectedSession}
-              onBack={() => setSelectedSession(null)}
+              onBack={() => handleSelectSession(null)}
               onUpdateSession={handleUpdateSession}
             />
           </ErrorBoundary>
@@ -131,8 +203,8 @@ export default function App() {
               sessions={sessions}
               selectedRepo={selectedRepo}
               selectedSessionId={undefined}
-              onRepoSelect={setSelectedRepo}
-              onSelectSession={setSelectedSession}
+              onRepoSelect={handleRepoSelect}
+              onSelectSession={handleSelectSession}
               onApprovePlan={handleApprovePlan}
               onOpenSettings={() => setIsSettingsOpen(true)}
               onOpenNewTask={() => setIsNewTaskOpen(true)}

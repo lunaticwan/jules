@@ -61,30 +61,31 @@ export const SessionCard: React.FC<SessionCardProps> = ({
   return (
     <div
       onClick={() => onSelect(session)}
-      className={`group relative flex items-center justify-between gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+      className={`group relative flex items-center justify-between gap-2 p-2 rounded-lg border transition-all cursor-pointer ${
         isSelected
-          ? 'bg-blue-950/30 border-blue-500 shadow-md ring-1 ring-blue-500/50'
+          ? 'bg-blue-950/40 border-blue-500 shadow-sm ring-1 ring-blue-500/50'
           : isAwaitingApproval
-          ? 'bg-amber-950/10 border-amber-800/60 hover:border-amber-500/80'
-          : 'bg-white dark:bg-slate-900/80 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+          ? 'bg-amber-950/15 border-amber-800/70 hover:border-amber-500/80'
+          : 'bg-white dark:bg-slate-900/90 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-850'
       }`}
     >
       {/* Left Column: Repository info & Session Title */}
-      <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex items-center gap-2 flex-wrap text-xs">
-          <span className="font-mono font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/80 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900/60 text-[11px] truncate max-w-[180px]">
+      <div className="flex-1 min-w-0 space-y-0.5">
+        <div className="flex items-center gap-1.5 flex-wrap text-xs">
+          {/* full repository name with dark/light styling, break-all / no truncate restriction */}
+          <span className="font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/90 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900/70 text-[11px] shrink-0 break-all">
             {session.repository}
           </span>
           <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
             ({session.baseBranch || 'main'})
           </span>
 
-          <div className="inline-flex items-center gap-1.5 text-slate-400 ml-1" onClick={(e) => e.stopPropagation()}>
+          <div className="inline-flex items-center gap-1 text-slate-400 ml-0.5" onClick={(e) => e.stopPropagation()}>
             <a
               href={repoLinks.repoUrl}
               target="_blank"
               rel="noreferrer"
-              className="hover:text-slate-200 transition-colors"
+              className="hover:text-slate-200 transition-colors p-0.5"
               title="GitHub 레포지토리"
             >
               <GitBranch className="h-3 w-3" />
@@ -93,7 +94,7 @@ export const SessionCard: React.FC<SessionCardProps> = ({
               href={repoLinks.pagesUrl}
               target="_blank"
               rel="noreferrer"
-              className="text-emerald-500 hover:text-emerald-400 transition-colors"
+              className="text-emerald-500 hover:text-emerald-400 transition-colors p-0.5"
               title="배포 페이지"
             >
               <Globe className="h-3 w-3" />
@@ -101,11 +102,11 @@ export const SessionCard: React.FC<SessionCardProps> = ({
           </div>
         </div>
 
-        <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors">
+        <h3 className="text-[12px] font-semibold text-slate-900 dark:text-slate-100 truncate leading-snug group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors">
           {session.title || session.prompt}
         </h3>
 
-        <div className="flex items-center gap-3 text-[10px] text-slate-500 dark:text-slate-400 pt-0.5">
+        <div className="flex items-center gap-2.5 text-[10px] text-slate-500 dark:text-slate-400">
           <span>{getRelativeTime(session.updatedAt)}</span>
           {session.prNumber && (
             <a
@@ -113,7 +114,7 @@ export const SessionCard: React.FC<SessionCardProps> = ({
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:underline font-mono"
+              className="inline-flex items-center gap-0.5 text-purple-600 dark:text-purple-400 hover:underline font-mono"
             >
               <GitPullRequest className="h-3 w-3" />
               PR #{session.prNumber}
@@ -124,21 +125,21 @@ export const SessionCard: React.FC<SessionCardProps> = ({
       </div>
 
       {/* Right Column: Status & Direct Action Button */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-1.5 shrink-0 pl-1">
         <div>{getStatusBadge()}</div>
 
         {isAwaitingApproval ? (
           <Button
             size="sm"
             variant="primary"
-            className="text-[11px] py-1 px-2.5 h-7"
+            className="text-[10px] py-0.5 px-2 h-6"
             onClick={(e) => onApprovePlan(session.id, e)}
           >
             승인
           </Button>
         ) : (
-          <div className="text-slate-400 dark:text-slate-500 group-hover:text-slate-200 p-1">
-            <ArrowRight className="h-4 w-4" />
+          <div className="text-slate-400 dark:text-slate-500 group-hover:text-slate-200 p-0.5">
+            <ArrowRight className="h-3.5 w-3.5" />
           </div>
         )}
       </div>

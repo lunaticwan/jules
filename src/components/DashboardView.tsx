@@ -126,15 +126,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </header>
 
       {/* 업무용 단일 통합 툴바 (Repository Dropdown & Search & Status Filter) */}
-      <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 space-y-2.5">
+      <div className="p-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 space-y-1.5">
         {/* Repo Select & Search */}
-        <div className="flex gap-2 items-center">
+        <div className="flex flex-col sm:flex-row gap-1.5 items-stretch sm:items-center">
           {/* Repository Dropdown Select */}
-          <div className="relative shrink-0 max-w-[160px] sm:max-w-[200px]">
+          <div className="relative shrink-0 w-full sm:w-auto min-w-[180px]">
             <select
               value={selectedRepo}
               onChange={(e) => onRepoSelect(e.target.value)}
-              className="w-full appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-lg pl-2.5 pr-7 py-1.5 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500 truncate"
+              className="w-full appearance-none bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-md pl-2 pr-6 py-1 text-xs font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               <option value="ALL">전체 레포지토리 ({sessions.length})</option>
               {allRepos.map((repo) => {
@@ -146,23 +146,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 );
               })}
             </select>
-            <Filter className="absolute right-2 top-2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            <Filter className="absolute right-2 top-1.5 h-3 w-3 text-slate-400 pointer-events-none" />
           </div>
 
           {/* Search Input */}
           <div className="relative flex-1">
-            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+            <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-slate-400" />
             <input
               type="text"
               placeholder="태스크/레포 검색..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 pl-7 pr-2 py-1 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1.5 text-xs text-slate-400 hover:text-slate-200"
+                className="absolute right-2 top-1 text-xs text-slate-400 hover:text-slate-200"
               >
                 ✕
               </button>
@@ -172,16 +172,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {/* Selected Repo Quick Links */}
         {selectedRepo !== 'ALL' && (
-          <div className="flex items-center justify-between text-xs bg-blue-50/50 dark:bg-blue-950/30 px-2.5 py-1.5 rounded-lg border border-blue-200/60 dark:border-blue-900/40">
-            <span className="font-semibold text-blue-700 dark:text-blue-300 font-mono text-[11px] truncate">
+          <div className="flex items-center justify-between text-xs bg-blue-50/60 dark:bg-blue-950/40 px-2 py-1 rounded-md border border-blue-200/80 dark:border-blue-900/50">
+            <span className="font-bold text-blue-700 dark:text-blue-300 font-mono text-[11px] break-all">
               {selectedRepo}
             </span>
-            <div className="flex items-center gap-2 text-[11px] shrink-0">
+            <div className="flex items-center gap-1.5 text-[10px] shrink-0 ml-2">
               <a
                 href={getRepoLinks(selectedRepo).repoUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1 text-slate-600 dark:text-slate-300 hover:text-blue-500"
+                className="flex items-center gap-0.5 text-slate-600 dark:text-slate-300 hover:text-blue-500 font-medium"
               >
                 <GitBranch className="h-3 w-3" />
                 GitHub
@@ -191,7 +191,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 href={getRepoLinks(selectedRepo).pagesUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:underline"
+                className="flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 hover:underline font-medium"
               >
                 <Globe className="h-3 w-3" />
                 페이지
@@ -201,10 +201,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         )}
 
         {/* Status Filter Indicator Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pt-0.5 no-scrollbar">
+        <div className="flex items-center gap-1 overflow-x-auto pt-0.5 no-scrollbar">
           <button
             onClick={() => setStatusFilter('ALL')}
-            className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors shrink-0 ${
+            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors shrink-0 ${
               statusFilter === 'ALL'
                 ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 font-bold'
                 : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-200'
@@ -215,19 +215,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => setStatusFilter('IN_PROGRESS')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors shrink-0 ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors shrink-0 ${
               statusFilter === 'IN_PROGRESS'
                 ? 'bg-blue-600 text-white font-bold'
                 : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-900/40'
             }`}
           >
             <Clock className="h-3 w-3" />
-            진행 중 ({inProgressCount})
+            진행 ({inProgressCount})
           </button>
 
           <button
             onClick={() => setStatusFilter('AWAITING_APPROVAL')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors shrink-0 ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors shrink-0 ${
               statusFilter === 'AWAITING_APPROVAL'
                 ? 'bg-amber-600 text-white font-bold'
                 : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/40'
@@ -239,20 +239,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => setStatusFilter('COMPLETED')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors shrink-0 ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors shrink-0 ${
               statusFilter === 'COMPLETED'
                 ? 'bg-emerald-600 text-white font-bold'
                 : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/40'
             }`}
           >
             <CheckCircle2 className="h-3 w-3" />
-            완료됨 ({completedCount})
+            완료 ({completedCount})
           </button>
         </div>
       </div>
 
       {/* Session List Grid */}
-      <div className="p-3 space-y-2">
+      <div className="p-2 space-y-1.5">
         {filteredSessions.length === 0 ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-8 text-center text-slate-500 dark:text-slate-400">
             <p className="text-xs font-medium">검색 조건에 맞는 작업 세션이 없습니다.</p>
