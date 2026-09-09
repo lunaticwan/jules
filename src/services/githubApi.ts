@@ -1,3 +1,5 @@
+import { githubClient } from './apiClient';
+
 // GitHub REST API 서비스
 
 export interface GitHubPRDetails {
@@ -40,26 +42,27 @@ export function setGitHubToken(token: string): void {
   localStorage.setItem(GITHUB_TOKEN_KEY, token.trim());
 }
 
+export function clearGitHubToken(): void {
+  localStorage.removeItem(GITHUB_TOKEN_KEY);
+}
+
 /**
- * 사용자의 GitHub 레포지토리 목록 가져오기
+ * 사용자의 GitHub 레포지토리 목록 가져오기 (Axios 활용)
  */
 export async function fetchUserRepositories(): Promise<string[]> {
   const token = getGitHubToken();
   if (!token) return [];
 
   try {
-    const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
-      headers: {
-        Accept: 'application/vnd.github.v3+json',
-        Authorization: `token ${token}`,
+    const res = await githubClient.get('/user/repos', {
+      params: {
+        per_page: 100,
+        sort: 'updated',
       },
     });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        return data.map((r: any) => r.full_name);
-      }
+    if (Array.isArray(res.data)) {
+      return res.data.map((r: any) => r.full_name);
     }
   } catch (err) {
     console.warn('GitHub 레포지토리 목록 수신 실패:', err);
@@ -67,27 +70,13 @@ export async function fetchUserRepositories(): Promise<string[]> {
   return [];
 }
 
-export function clearGitHubToken(): void {
-  localStorage.removeItem(GITHUB_TOKEN_KEY);
-}
-
 /**
- * 특정 레포지토리의 Pull Request 상태 조회
+ * 특정 레포지토리의 Pull Request 상태 조회 (Axios 활용)
  */
 export async function fetchGitHubPR(repo: string, prNumber: number): Promise<GitHubPRDetails | null> {
-  const token = getGitHubToken();
-  const headers: Record<string, string> = {
-    Accept: 'application/vnd.github.v3+json',
-  };
-  if (token) {
-    headers.Authorization = `token ${token}`;
-  }
-
   try {
-    const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${prNumber}`, { headers });
-    if (!response.ok) return null;
-
-    const data = await response.json();
+    const response = await githubClient.get(`/repos/${repo}/pulls/${prNumber}`);
+    const data = response.data;
     return {
       number: data.number,
       title: data.title,
@@ -113,28 +102,19 @@ export interface RepoDeploymentHealth {
 }
 
 /**
- * 특정 레포지토리의 GitHub Pages 배포 헬스 및 CI 체크 상태 통합 조회
+ * 특정 레포지토리의 GitHub Pages 배포 헬스 및 CI 체크 상태 통합 조회 (Axios 활용)
  */
 export async function fetchRepoDeploymentStatus(repo: string): Promise<RepoDeploymentHealth> {
-  const token = getGitHubToken();
-  const headers: Record<string, string> = {
-    Accept: 'application/vnd.github.v3+json',
-  };
-  if (token) {
-    headers.Authorization = `token ${token}`;
-  }
-
   const links = getRepoLinks(repo);
 
   try {
-    const res = await fetch(`https://api.github.com/repos/${repo}/pages`, { headers });
-    if (res.ok) {
-      const data = await res.json();
+    const res = await githubClient.get(`/repos/${repo}/pages`);
+    if (res.data) {
       return {
         repo,
         pagesDeployed: true,
-        deploymentUrl: data.html_url || links.pagesUrl,
-        lastDeployedAt: data.updated_at || new Date().toISOString(),
+        deploymentUrl: res.data.html_url || links.pagesUrl,
+        lastDeployedAt: res.data.updated_at || new Date().toISOString(),
         checkStatus: 'success',
       };
     }
@@ -152,22 +132,12 @@ export async function fetchRepoDeploymentStatus(repo: string): Promise<RepoDeplo
 }
 
 /**
- * CI/CD Check Runs 상태 조회
+ * CI/CD Check Runs 상태 조회 (Axios 활용)
  */
 export async function fetchCheckRuns(repo: string, ref: string): Promise<'success' | 'failure' | 'pending'> {
-  const token = getGitHubToken();
-  const headers: Record<string, string> = {
-    Accept: 'application/vnd.github.v3+json',
-  };
-  if (token) {
-    headers.Authorization = `token ${token}`;
-  }
-
   try {
-    const response = await fetch(`https://api.github.com/repos/${repo}/commits/${ref}/check-runs`, { headers });
-    if (!response.ok) return 'pending';
-
-    const data = await response.json();
+    const response = await githubClient.get(`/repos/${repo}/commits/${ref}/check-runs`);
+    const data = response.data;
     if (!data.check_runs || data.check_runs.length === 0) return 'pending';
 
     const runs = data.check_runs;

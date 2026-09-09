@@ -1,3 +1,5 @@
+import { julesClient } from './apiClient';
+
 // Google Jules REST API 서비스
 
 export interface JulesMessage {
@@ -177,7 +179,7 @@ export function saveStoredSessions(sessions: JulesSession[]): void {
 }
 
 /**
- * Jules 세션 목록 가져오기 (실제 API 시도 후 실패 또는 연동 불가 시 로컬 데이터 반환)
+ * Jules 세션 목록 가져오기 (Axios 클라이언트 활용, 실패 시 로컬 데이터 반환)
  */
 export async function fetchJulesSessions(): Promise<JulesSession[]> {
   const apiKey = getJulesApiKey();
@@ -186,19 +188,10 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
   }
 
   try {
-    const response = await fetch(`https://jules.googleapis.com/v1alpha/sessions?key=${apiKey}`, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Jules API 오류: ${response.status}`);
-    }
-
-    const data = await response.json();
+    const response = await julesClient.get('/sessions');
+    const data = response.data;
     if (Array.isArray(data.sessions)) {
-      // Jules API 응답 규격 안전 정형화
+      // Jules API 응답 규격 정형화
       return data.sessions.map((s: any, index: number) => ({
         id: s.id || s.name?.split('/')?.pop() || `session-${index}`,
         name: s.name || `sessions/session-${index}`,
@@ -223,7 +216,7 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
 }
 
 /**
- * 특정 Jules 세션 상세 정보 가져오기
+ * 특정 Jules 세션 상세 정보 가져오기 (Axios 클라이언트 활용)
  */
 export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesSession | null> {
   const sessions = getStoredSessions();
@@ -233,9 +226,9 @@ export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesS
   const apiKey = getJulesApiKey();
   if (apiKey) {
     try {
-      const response = await fetch(`https://jules.googleapis.com/v1alpha/${sessionId}?key=${apiKey}`);
-      if (response.ok) {
-        return await response.json();
+      const response = await julesClient.get(`/${sessionId}`);
+      if (response.data) {
+        return response.data;
       }
     } catch (err) {
       console.warn('Jules 세션 상세 조회 실패:', err);
@@ -246,7 +239,7 @@ export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesS
 }
 
 /**
- * 신규 Jules 세션 생성
+ * 신규 Jules 세션 생성 (Axios 클라이언트 활용)
  */
 export async function createJulesSession(params: {
   repository: string;
@@ -289,18 +282,13 @@ export async function createJulesSession(params: {
 
   if (apiKey) {
     try {
-      const response = await fetch(`https://jules.googleapis.com/v1alpha/sessions?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          repository: params.repository,
-          baseBranch: params.baseBranch,
-          prompt: params.prompt
-        })
+      const response = await julesClient.post('/sessions', {
+        repository: params.repository,
+        baseBranch: params.baseBranch,
+        prompt: params.prompt
       });
-      if (response.ok) {
-        const remoteData = await response.json();
-        const combined = { ...newSession, ...remoteData };
+      if (response.data) {
+        const combined = { ...newSession, ...response.data };
         const current = getStoredSessions();
         saveStoredSessions([combined, ...current]);
         return combined;
@@ -346,9 +334,6 @@ export async function approveJulesPlan(sessionId: string): Promise<JulesSession>
 }
 
 /**
- * 메시지 전송 / 수정 요청
- */
-/**
  * 스마트 1-Click AI 액션 제안 생성 및 세션 자동 발주
  */
 export async function triggerQuickAiAction(repo: string, actionType: 'lint' | 'security' | 'perf' | 'test'): Promise<JulesSession> {
@@ -366,6 +351,9 @@ export async function triggerQuickAiAction(repo: string, actionType: 'lint' | 's
   });
 }
 
+/**
+ * 메시지 전송 / 수정 요청
+ */
 export async function sendJulesMessage(sessionId: string, message: string): Promise<JulesSession> {
   const sessions = getStoredSessions();
   const idx = sessions.findIndex((s) => s.id === sessionId || s.name === sessionId);

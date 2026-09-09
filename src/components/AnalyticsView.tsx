@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Sparkles, TrendingUp, Zap, Code2, Globe, CheckCircle2, Play } from 'lucide-react';
-import { JulesSession, triggerQuickAiAction } from '../services/julesApi';
-import { fetchRepoDeploymentStatus, RepoDeploymentHealth } from '../services/githubApi';
+import { JulesSession } from '../services/julesApi';
+import { useRepoDeploymentStatusQuery } from '../hooks/useGitHubQueries';
+import { useQuickAiActionMutation } from '../hooks/useJulesQueries';
 
 interface AnalyticsViewProps {
   sessions: JulesSession[];
@@ -13,39 +14,23 @@ interface AnalyticsViewProps {
  */
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessionCreated }) => {
   const total = sessions.length;
-  const [healthData, setHealthData] = useState<RepoDeploymentHealth[]>([]);
-  const [isExecutingAction, setIsExecutingAction] = useState<string | null>(null);
-
-  // 저장소 목록 추출
   const repos = Array.from(new Set(sessions.map((s) => s.repository)));
 
-  useEffect(() => {
-    const loadHealth = async () => {
-      const results = await Promise.all(
-        repos.map((r) => fetchRepoDeploymentStatus(r))
-      );
-      setHealthData(results);
-    };
-    if (repos.length > 0) {
-      loadHealth();
-    }
-  }, [sessions]);
+  const { data: healthData = [] } = useRepoDeploymentStatusQuery(repos);
+  const quickAiActionMutation = useQuickAiActionMutation();
 
   const handleQuickAction = async (repo: string, type: 'lint' | 'security' | 'perf' | 'test') => {
-    setIsExecutingAction(`${repo}-${type}`);
     try {
-      const newSession = await triggerQuickAiAction(repo, type);
+      const newSession = await quickAiActionMutation.mutateAsync({ repo, actionType: type });
       if (onSessionCreated) {
         onSessionCreated(newSession);
       }
     } catch (err) {
       console.error(err);
-    } finally {
-      setIsExecutingAction(null);
     }
   };
-  const completed = sessions.filter((s) => s.state === 'COMPLETED').length;
 
+  const completed = sessions.filter((s) => s.state === 'COMPLETED').length;
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   // 저장소별 세션 분포
@@ -104,7 +89,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
 
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button
-            disabled={!!isExecutingAction || repos.length === 0}
+            disabled={quickAiActionMutation.isPending || repos.length === 0}
             onClick={() => handleQuickAction(repos[0] || 'acme/mobile-pwa', 'perf')}
             className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-800/90 border border-indigo-100 dark:border-indigo-800/60 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all text-left group"
           >
@@ -116,7 +101,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
           </button>
 
           <button
-            disabled={!!isExecutingAction || repos.length === 0}
+            disabled={quickAiActionMutation.isPending || repos.length === 0}
             onClick={() => handleQuickAction(repos[0] || 'acme/mobile-pwa', 'security')}
             className="flex items-center justify-between p-2.5 rounded-xl bg-white dark:bg-slate-800/90 border border-indigo-100 dark:border-indigo-800/60 hover:border-indigo-400 dark:hover:border-indigo-500 transition-all text-left group"
           >

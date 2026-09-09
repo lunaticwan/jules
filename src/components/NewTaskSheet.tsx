@@ -3,7 +3,8 @@ import { Sparkles, Send } from 'lucide-react';
 import { Sheet } from './ui/Sheet';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { createJulesSession, JulesSession } from '../services/julesApi';
+import { JulesSession } from '../services/julesApi';
+import { useCreateJulesSessionMutation } from '../hooks/useJulesQueries';
 
 export interface NewTaskSheetProps {
   isOpen: boolean;
@@ -28,15 +29,16 @@ export const NewTaskSheet: React.FC<NewTaskSheetProps> = ({
   const [repository, setRepository] = useState(existingRepos[0] || 'acme/mobile-pwa');
   const [baseBranch, setBaseBranch] = useState('main');
   const [prompt, setPrompt] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const createSessionMutation = useCreateJulesSessionMutation();
+  const isSubmitting = createSessionMutation.isPending;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!repository.trim() || !prompt.trim() || isSubmitting) return;
 
-    setIsSubmitting(true);
     try {
-      const newSession = await createJulesSession({
+      const newSession = await createSessionMutation.mutateAsync({
         repository: repository.trim(),
         baseBranch: baseBranch.trim() || 'main',
         prompt: prompt.trim(),
@@ -46,8 +48,6 @@ export const NewTaskSheet: React.FC<NewTaskSheetProps> = ({
       onClose();
     } catch (err) {
       console.error('태스크 생성 실패:', err);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
