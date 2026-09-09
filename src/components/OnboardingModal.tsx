@@ -109,10 +109,15 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               value={githubToken}
               onChange={(e) => setGithubTokenInput(e.target.value)}
             />
-            <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
-              <Info className="h-3 w-3 text-blue-400 shrink-0" />
-              GitHub PAT 입력 시 라이브 PR 상태 및 CI/CD 빌드 배지를 조회함.
-            </p>
+            <div className="mt-2 rounded-lg bg-slate-800/80 p-2.5 text-[11px] text-slate-300 border border-slate-700 space-y-1">
+              <p className="flex items-center gap-1 font-semibold text-blue-400">
+                <Info className="h-3.5 w-3.5 shrink-0" />
+                GitHub 미연동 시 기능 작동 안내
+              </p>
+              <p className="text-slate-400 leading-relaxed">
+                GitHub PAT를 연동하지 않더라도 Jules의 작업 세션 관리, 플랜 검토/승인 및 피드백 대화 기능은 로컬/Mock 모드로 제한 없이 모두 사용 가능함.
+              </p>
+            </div>
           </div>
 
           <div className="mt-6 flex items-center justify-between gap-2 pt-2 border-t border-slate-800">
