@@ -9,12 +9,14 @@ export interface TaskDetailViewProps {
   session: JulesSession;
   onBack: () => void;
   onUpdateSession: (updated: JulesSession) => void;
+  isSplitView?: boolean;
 }
 
 export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   session,
   onBack,
   onUpdateSession,
+  isSplitView = false,
 }) => {
   const [inputMsg, setInputMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,12 +56,14 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
       {/* Header */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-800 bg-slate-900/90 px-4 py-3 backdrop-blur-md safe-pt shrink-0">
         <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
+          {!isSplitView && (
+            <button
+              onClick={onBack}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+          )}
           <div>
             <h2 className="text-sm font-bold text-slate-100 line-clamp-1">
               {session.title || session.prompt}

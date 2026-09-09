@@ -7,12 +7,14 @@ import { JulesSession } from '../services/julesApi';
 
 export interface SessionCardProps {
   session: JulesSession;
+  isSelected?: boolean;
   onSelect: (session: JulesSession) => void;
   onApprovePlan: (sessionId: string, e: React.MouseEvent) => void;
 }
 
 export const SessionCard: React.FC<SessionCardProps> = ({
   session,
+  isSelected = false,
   onSelect,
   onApprovePlan,
 }) => {
@@ -58,7 +60,9 @@ export const SessionCard: React.FC<SessionCardProps> = ({
     <Card
       highlighted={isAwaitingApproval}
       onClick={() => onSelect(session)}
-      className="cursor-pointer active:scale-[0.99] transition-transform space-y-3"
+      className={`cursor-pointer active:scale-[0.99] transition-all space-y-3 ${
+        isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-950/20' : ''
+      }`}
     >
       <div className="flex items-start justify-between gap-2">
         <div>
