@@ -198,7 +198,22 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
 
     const data = await response.json();
     if (Array.isArray(data.sessions)) {
-      return data.sessions;
+      // Jules API 응답 규격 안전 정형화
+      return data.sessions.map((s: any, index: number) => ({
+        id: s.id || s.name?.split('/')?.pop() || `session-${index}`,
+        name: s.name || `sessions/session-${index}`,
+        repository: s.repository || 'unknown/repository',
+        baseBranch: s.baseBranch || 'main',
+        prompt: s.prompt || s.title || 'No prompt provided',
+        state: s.state || 'IN_PROGRESS',
+        createdAt: s.createdAt || s.createTime || new Date().toISOString(),
+        updatedAt: s.updatedAt || s.updateTime || new Date().toISOString(),
+        title: s.title || s.prompt?.slice(0, 40) || 'Untitled Session',
+        prUrl: s.prUrl || s.pullRequestUrl || undefined,
+        prNumber: s.prNumber || s.pullRequestNumber || undefined,
+        plan: Array.isArray(s.plan) ? s.plan : [],
+        messages: Array.isArray(s.messages) ? s.messages : [],
+      }));
     }
   } catch (err) {
     console.warn('Jules API 호출 실패, 로컬 저장소 데이터 반환:', err);

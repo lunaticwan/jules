@@ -40,6 +40,33 @@ export function setGitHubToken(token: string): void {
   localStorage.setItem(GITHUB_TOKEN_KEY, token.trim());
 }
 
+/**
+ * 사용자의 GitHub 레포지토리 목록 가져오기
+ */
+export async function fetchUserRepositories(): Promise<string[]> {
+  const token = getGitHubToken();
+  if (!token) return [];
+
+  try {
+    const res = await fetch('https://api.github.com/user/repos?per_page=100&sort=updated', {
+      headers: {
+        Accept: 'application/vnd.github.v3+json',
+        Authorization: `token ${token}`,
+      },
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        return data.map((r: any) => r.full_name);
+      }
+    }
+  } catch (err) {
+    console.warn('GitHub 레포지토리 목록 수신 실패:', err);
+  }
+  return [];
+}
+
 export function clearGitHubToken(): void {
   localStorage.removeItem(GITHUB_TOKEN_KEY);
 }

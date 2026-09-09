@@ -9,6 +9,7 @@ import { OnboardingModal } from './components/OnboardingModal';
 import { DashboardView } from './components/DashboardView';
 import { TaskDetailView } from './components/TaskDetailView';
 import { NewTaskSheet } from './components/NewTaskSheet';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function App() {
   const [sessions, setSessions] = useState<JulesSession[]>([]);
@@ -90,12 +91,14 @@ export default function App() {
         {/* Right Side: Task Detail View or Empty Selection Placeholder */}
         <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden">
           {selectedSession ? (
-            <TaskDetailView
-              session={selectedSession}
-              onBack={() => setSelectedSession(null)}
-              onUpdateSession={handleUpdateSession}
-              isSplitView
-            />
+            <ErrorBoundary onReset={() => setSelectedSession(null)}>
+              <TaskDetailView
+                session={selectedSession}
+                onBack={() => setSelectedSession(null)}
+                onUpdateSession={handleUpdateSession}
+                isSplitView
+              />
+            </ErrorBoundary>
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
               <div className="h-16 w-16 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-4 text-slate-400">
@@ -115,25 +118,29 @@ export default function App() {
       {/* 모바일 (갤럭시 폴드5 접힘 포함, md 미만) Single Column View */}
       <div className="block md:hidden min-h-screen bg-slate-900 max-w-md mx-auto shadow-2xl">
         {selectedSession ? (
-          <TaskDetailView
-            session={selectedSession}
-            onBack={() => setSelectedSession(null)}
-            onUpdateSession={handleUpdateSession}
-          />
+          <ErrorBoundary onReset={() => setSelectedSession(null)}>
+            <TaskDetailView
+              session={selectedSession}
+              onBack={() => setSelectedSession(null)}
+              onUpdateSession={handleUpdateSession}
+            />
+          </ErrorBoundary>
         ) : (
-          <DashboardView
-            sessions={sessions}
-            selectedRepo={selectedRepo}
-            selectedSessionId={undefined}
-            onRepoSelect={setSelectedRepo}
-            onSelectSession={setSelectedSession}
-            onApprovePlan={handleApprovePlan}
-            onOpenSettings={() => setIsSettingsOpen(true)}
-            onOpenNewTask={() => setIsNewTaskOpen(true)}
-            onRefresh={loadSessions}
-            onSessionCreated={handleSessionCreated}
-            isLoading={isLoading}
-          />
+          <ErrorBoundary>
+            <DashboardView
+              sessions={sessions}
+              selectedRepo={selectedRepo}
+              selectedSessionId={undefined}
+              onRepoSelect={setSelectedRepo}
+              onSelectSession={setSelectedSession}
+              onApprovePlan={handleApprovePlan}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              onOpenNewTask={() => setIsNewTaskOpen(true)}
+              onRefresh={loadSessions}
+              onSessionCreated={handleSessionCreated}
+              isLoading={isLoading}
+            />
+          </ErrorBoundary>
         )}
       </div>
 
