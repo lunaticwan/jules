@@ -90,9 +90,9 @@ src/
 
 ---
 
-## 5. API 연동 명세 요약 (API Reference Summary)
+## 5. 프로젝트 문서 안내 (Project Documentation)
 
-자세한 API 명세는 다음 전용 가이드 문서를 참조함:
+자세한 API 명세 및 변경 이력은 다음 전용 가이드 문서를 참조함:
 
 - **Google Jules REST API 명세**: [`JULES_API.md`](./JULES_API.md)
   - Base URL: `https://jules.googleapis.com/v1alpha`
@@ -102,6 +102,8 @@ src/
   - Base URL: `https://api.github.com`
   - Bearer / Token Auth (Octokit SDK v5)
   - 사용자 정보, 저장소 목록, PR 상태, GitHub Pages 배포 헬스, Check Runs 조회 API
+- **프로젝트 변경 이력**: [`CHANGELOG.md`](./CHANGELOG.md)
+  - 버전별 주요 기능 구현, 버그 수정 및 개선 사항 관리
 
 ---
 
