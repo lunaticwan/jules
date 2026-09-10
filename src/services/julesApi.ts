@@ -246,28 +246,64 @@ let inMemorySessionsCache: JulesSession[] | null = null;
  * 로컬 캐시/LocalStorage에 저장된 세션 목록을 반환함
  */
 export function getStoredSessions(): JulesSession[] {
+  let list: JulesSession[] = [];
   try {
     const data = localStorage.getItem(STORAGE_KEYS.MOCK_SESSIONS);
-    if (!data) {
-      if (!inMemorySessionsCache) inMemorySessionsCache = INITIAL_MOCK_SESSIONS;
-      try {
-        localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(INITIAL_MOCK_SESSIONS));
-      } catch {}
-      return inMemorySessionsCache;
-    }
-    const parsed = JSON.parse(data);
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      inMemorySessionsCache = parsed;
-      return parsed;
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        list = parsed;
+      }
     }
   } catch (err) {
     console.warn('LocalStorage 세션 파싱 실패, 인메모리 반환:', err);
   }
 
-  if (!inMemorySessionsCache) {
+  if (list.length === 0) {
+    list = INITIAL_MOCK_SESSIONS;
     inMemorySessionsCache = INITIAL_MOCK_SESSIONS;
+    try {
+      localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(INITIAL_MOCK_SESSIONS));
+    } catch {}
+  } else {
+    inMemorySessionsCache = list;
   }
-  return inMemorySessionsCache;
+  // inMemoryCache 참상태 유지
+  if (inMemorySessionsCache) {
+    // cached
+  }
+
+  return list.map((s, index) => ({
+    ...s,
+    id: s.id || `sess-${index + 101}`,
+    name: s.name || `sessions/${s.id || `sess-${index + 101}`}`,
+    repository: (!s.repository || s.repository === 'unknown/repository') ? 'acme/mobile-pwa' : s.repository,
+    baseBranch: s.baseBranch || 'main',
+    prompt: s.prompt || s.title || 'No prompt provided',
+    state: s.state || 'IN_PROGRESS',
+    createdAt: s.createdAt || new Date().toISOString(),
+    updatedAt: s.updatedAt || new Date().toISOString(),
+    title: s.title || s.prompt || 'Untitled Session',
+    plan: Array.isArray(s.plan) ? s.plan : [],
+    messages: Array.isArray(s.messages) && s.messages.length > 0
+      ? s.messages
+      : [
+          {
+            id: `msg-fallback-1`,
+            sender: 'user',
+            content: s.prompt || '작업 요청',
+            timestamp: s.createdAt || new Date().toISOString(),
+            type: 'text',
+          },
+          {
+            id: `msg-fallback-2`,
+            sender: 'jules',
+            content: '작업 세션이 진행 중입니다.',
+            timestamp: s.updatedAt || new Date().toISOString(),
+            type: 'thought',
+          },
+        ],
+  }));
 }
 
 /**
@@ -295,21 +331,38 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
     const response = await julesClient.get('/sessions');
     const data = response.data;
     if (Array.isArray(data.sessions)) {
-      return data.sessions.map((s: any, index: number) => ({
+      const mapped = data.sessions.map((s: any, index: number) => ({
         id: s.id || s.name?.split('/')?.pop() || `session-${index}`,
         name: s.name || `sessions/session-${index}`,
-        repository: s.repository || 'unknown/repository',
+        repository: s.repository || s.repo || s.targetRepository || 'acme/mobile-pwa',
         baseBranch: s.baseBranch || 'main',
         prompt: s.prompt || s.title || 'No prompt provided',
         state: s.state || 'IN_PROGRESS',
         createdAt: s.createdAt || s.createTime || new Date().toISOString(),
         updatedAt: s.updatedAt || s.updateTime || new Date().toISOString(),
-        title: s.title || s.prompt?.slice(0, 40) || 'Untitled Session',
+        title: s.title || s.prompt || 'Untitled Session',
         prUrl: s.prUrl || s.pullRequestUrl || undefined,
         prNumber: s.prNumber || s.pullRequestNumber || undefined,
         plan: Array.isArray(s.plan) ? s.plan : [],
-        messages: Array.isArray(s.messages) ? s.messages : [],
+        messages: Array.isArray(s.messages) && s.messages.length > 0 ? s.messages : [
+          {
+            id: `msg-${index}-1`,
+            sender: 'user',
+            content: s.prompt || s.title || '작업 요청 내용',
+            timestamp: s.createdAt || new Date().toISOString(),
+            type: 'text',
+          },
+          {
+            id: `msg-${index}-2`,
+            sender: 'jules',
+            content: '요청 사항을 분석하고 작업을 수행 중입니다.',
+            timestamp: s.updatedAt || new Date().toISOString(),
+            type: 'thought',
+          },
+        ],
       }));
+      saveStoredSessions(mapped);
+      return mapped;
     }
   } catch (err) {
     console.warn('Jules API 호출 실패, 로컬 저장소 데이터 반환:', err);
@@ -322,23 +375,44 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
  * 특정 Jules 세션의 상세 정보를 조회함
  */
 export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesSession | null> {
-  const sessions = getStoredSessions();
-  const found = sessions.find((s) => s.id === sessionId || s.name === sessionId);
-  if (found) return found;
-
   const apiKey = getJulesApiKey();
   if (apiKey) {
     try {
       const response = await julesClient.get(`/${sessionId}`);
       if (response.data) {
-        return response.data;
+        const s = response.data;
+        return {
+          id: s.id || sessionId,
+          name: s.name || `sessions/${sessionId}`,
+          repository: s.repository || s.repo || 'acme/mobile-pwa',
+          baseBranch: s.baseBranch || 'main',
+          prompt: s.prompt || s.title || '',
+          state: s.state || 'IN_PROGRESS',
+          createdAt: s.createdAt || new Date().toISOString(),
+          updatedAt: s.updatedAt || new Date().toISOString(),
+          title: s.title || s.prompt || 'Untitled Session',
+          prUrl: s.prUrl || s.pullRequestUrl || undefined,
+          prNumber: s.prNumber || s.pullRequestNumber || undefined,
+          plan: Array.isArray(s.plan) ? s.plan : [],
+          messages: Array.isArray(s.messages) && s.messages.length > 0 ? s.messages : [
+            {
+              id: `msg-detail-1`,
+              sender: 'user',
+              content: s.prompt || '작업 요청 사항',
+              timestamp: s.createdAt || new Date().toISOString(),
+              type: 'text',
+            },
+          ],
+        };
       }
     } catch (err) {
-      console.warn('Jules 세션 상세 조회 실패:', err);
+      console.warn('Jules 세션 상세 API 조회 실패, 로컬 세션 조회로 이동:', err);
     }
   }
 
-  return null;
+  const sessions = getStoredSessions();
+  const found = sessions.find((s) => s.id === sessionId || s.name === sessionId);
+  return found || null;
 }
 
 /**
