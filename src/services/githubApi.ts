@@ -1,6 +1,6 @@
-import { githubClient } from './apiClient';
+import { Octokit } from 'octokit';
 
-// GitHub REST API 서비스
+// GitHub REST API SDK 서비스 (Octokit 활용)
 
 export interface GitHubPRDetails {
   number: number;
@@ -47,40 +47,61 @@ export function clearGitHubToken(): void {
 }
 
 /**
- * 사용자의 GitHub 레포지토리 목록 가져오기 (Axios 활용)
+ * Octokit 클라이언트 인스턴스 팩토리
+ */
+export function getOctokitClient(): Octokit {
+  const token = getGitHubToken();
+  return new Octokit({
+    auth: token || undefined,
+  });
+}
+
+/**
+ * 사용자의 GitHub 레포지토리 목록 가져오기 (Octokit REST SDK 사용)
  */
 export async function fetchUserRepositories(): Promise<string[]> {
   const token = getGitHubToken();
   if (!token) return [];
 
   try {
-    const res = await githubClient.get('/user/repos', {
-      params: {
-        per_page: 100,
-        sort: 'updated',
-      },
+    const octokit = getOctokitClient();
+    const response = await octokit.rest.repos.listForAuthenticatedUser({
+      per_page: 100,
+      sort: 'updated',
     });
 
-    if (Array.isArray(res.data)) {
-      return res.data.map((r: any) => r.full_name);
+    if (Array.isArray(response.data)) {
+      return response.data.map((r) => r.full_name);
     }
   } catch (err) {
-    console.warn('GitHub 레포지토리 목록 수신 실패:', err);
+    console.warn('GitHub 레포지토리 목록 수신 실패 (Octokit):', err);
   }
   return [];
 }
 
 /**
- * 특정 레포지토리의 Pull Request 상태 조회 (Axios 활용)
+ * 특정 레포지토리의 Pull Request 상태 조회 (Octokit REST SDK 사용)
  */
 export async function fetchGitHubPR(repo: string, prNumber: number): Promise<GitHubPRDetails | null> {
+  const parts = repo.split('/');
+  const owner = parts[0];
+  const repoName = parts[1] || parts[0];
+
+  if (!owner || !repoName) return null;
+
   try {
-    const response = await githubClient.get(`/repos/${repo}/pulls/${prNumber}`);
+    const octokit = getOctokitClient();
+    const response = await octokit.rest.pulls.get({
+      owner,
+      repo: repoName,
+      pull_number: prNumber,
+    });
+
     const data = response.data;
     return {
       number: data.number,
       title: data.title,
-      state: data.state,
+      state: data.state as 'open' | 'closed',
       merged: data.merged || false,
       html_url: data.html_url,
       headBranch: data.head?.ref || '',
@@ -88,7 +109,7 @@ export async function fetchGitHubPR(repo: string, prNumber: number): Promise<Git
       updatedAt: data.updated_at,
     };
   } catch (err) {
-    console.warn('GitHub PR fetch failed:', err);
+    console.warn('GitHub PR fetch failed (Octokit):', err);
     return null;
   }
 }
@@ -102,24 +123,35 @@ export interface RepoDeploymentHealth {
 }
 
 /**
- * 특정 레포지토리의 GitHub Pages 배포 헬스 및 CI 체크 상태 통합 조회 (Axios 활용)
+ * 특정 레포지토리의 GitHub Pages 배포 헬스 및 CI 체크 상태 통합 조회 (Octokit REST SDK 사용)
  */
 export async function fetchRepoDeploymentStatus(repo: string): Promise<RepoDeploymentHealth> {
   const links = getRepoLinks(repo);
+  const parts = repo.split('/');
+  const owner = parts[0];
+  const repoName = parts[1] || parts[0];
 
-  try {
-    const res = await githubClient.get(`/repos/${repo}/pages`);
-    if (res.data) {
-      return {
-        repo,
-        pagesDeployed: true,
-        deploymentUrl: res.data.html_url || links.pagesUrl,
-        lastDeployedAt: res.data.updated_at || new Date().toISOString(),
-        checkStatus: 'success',
-      };
+  if (owner && repoName) {
+    try {
+      const octokit = getOctokitClient();
+      const response = await octokit.rest.repos.getPages({
+        owner,
+        repo: repoName,
+      });
+
+      if (response.data) {
+        const pagesData = response.data as any;
+        return {
+          repo,
+          pagesDeployed: true,
+          deploymentUrl: pagesData.html_url || links.pagesUrl,
+          lastDeployedAt: pagesData.updated_at || new Date().toISOString(),
+          checkStatus: 'success',
+        };
+      }
+    } catch (err) {
+      console.warn('GitHub Pages status fetch error (Octokit):', err);
     }
-  } catch (err) {
-    console.warn('GitHub Pages status fetch error:', err);
   }
 
   return {
@@ -132,19 +164,31 @@ export async function fetchRepoDeploymentStatus(repo: string): Promise<RepoDeplo
 }
 
 /**
- * CI/CD Check Runs 상태 조회 (Axios 활용)
+ * CI/CD Check Runs 상태 조회 (Octokit REST SDK 사용)
  */
 export async function fetchCheckRuns(repo: string, ref: string): Promise<'success' | 'failure' | 'pending'> {
+  const parts = repo.split('/');
+  const owner = parts[0];
+  const repoName = parts[1] || parts[0];
+
+  if (!owner || !repoName) return 'pending';
+
   try {
-    const response = await githubClient.get(`/repos/${repo}/commits/${ref}/check-runs`);
+    const octokit = getOctokitClient();
+    const response = await octokit.rest.checks.listForRef({
+      owner,
+      repo: repoName,
+      ref,
+    });
+
     const data = response.data;
     if (!data.check_runs || data.check_runs.length === 0) return 'pending';
 
     const runs = data.check_runs;
-    const hasFailure = runs.some((r: any) => r.conclusion === 'failure');
+    const hasFailure = runs.some((r) => r.conclusion === 'failure');
     if (hasFailure) return 'failure';
 
-    const allCompletedSuccess = runs.every((r: any) => r.status === 'completed' && r.conclusion === 'success');
+    const allCompletedSuccess = runs.every((r) => r.status === 'completed' && r.conclusion === 'success');
     if (allCompletedSuccess) return 'success';
 
     return 'pending';
