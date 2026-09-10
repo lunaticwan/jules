@@ -28,7 +28,7 @@ export const JulesPlanStepSchema = z.object({
 export const JulesSessionSchema = z.object({
   id: z.string(),
   name: z.string(),
-  repository: z.string().default('acme/mobile-pwa'),
+  repository: z.string().transform((val) => (!val || val === 'unknown/repository' ? 'acme/mobile-pwa' : val)).default('acme/mobile-pwa'),
   baseBranch: z.string().default('main'),
   prompt: z.string().default(''),
   state: z.enum(['IN_PROGRESS', 'AWAITING_APPROVAL', 'COMPLETED', 'FAILED']).default('IN_PROGRESS'),

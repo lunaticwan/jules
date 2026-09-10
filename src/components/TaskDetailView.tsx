@@ -324,18 +324,27 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                         <ReactMarkdown
                           remarkPlugins={[remarkGfm]}
                           components={{
-                            code({ inline, className, children, ...props }: any) {
-                              if (inline) {
+                            pre({ children }) {
+                              return (
+                                <pre className="bg-slate-900 text-slate-100 p-2.5 rounded-lg overflow-x-auto text-xs font-mono my-2 border border-slate-800">
+                                  {children}
+                                </pre>
+                              );
+                            },
+                            code({ className, children, ...props }: any) {
+                              const match = /language-(\w+)/.exec(className || '');
+                              const isMultiLine = typeof children === 'string' && children.includes('\n');
+                              if (match || isMultiLine) {
                                 return (
-                                  <code className="bg-slate-200 dark:bg-slate-700 text-pink-600 dark:text-pink-300 px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                  <code className={`${className || ''} font-mono text-xs`} {...props}>
                                     {children}
                                   </code>
                                 );
                               }
                               return (
-                                <pre className="bg-slate-900 text-slate-100 p-2.5 rounded-lg overflow-x-auto text-xs font-mono my-2 border border-slate-800">
-                                  <code {...props}>{children}</code>
-                                </pre>
+                                <code className="bg-slate-200 dark:bg-slate-700 text-pink-600 dark:text-pink-300 px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                  {children}
+                                </code>
                               );
                             },
                             p({ children }) {
