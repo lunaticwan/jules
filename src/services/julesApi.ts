@@ -161,6 +161,32 @@ export function clearJulesApiKey(): void {
   localStorage.removeItem(STORAGE_KEYS.JULES_KEY);
 }
 
+/**
+ * Jules API Key 유효성 검증
+ */
+export async function verifyJulesKey(keyInput?: string): Promise<{ success: boolean; message: string }> {
+  const apiKey = keyInput !== undefined ? keyInput.trim() : getJulesApiKey();
+  if (!apiKey) {
+    return { success: false, message: 'Jules API 키가 입력되지 않았음 (Mock 모드 동작)' };
+  }
+
+  try {
+    const res = await julesClient.get('/sessions', {
+      params: { key: apiKey }
+    });
+    if (res.status === 200) {
+      return { success: true, message: 'Jules API 연결 검증 성공' };
+    }
+    return { success: false, message: `Jules API 응답 상태 이상 (${res.status})` };
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (status === 401 || status === 403) {
+      return { success: false, message: '유효하지 않거나 권한이 없는 Jules API 키임' };
+    }
+    return { success: false, message: `Jules API 검증 실패: ${err?.message || '네트워크 오류'}` };
+  }
+}
+
 export function getStoredSessions(): JulesSession[] {
   const data = localStorage.getItem(STORAGE_KEYS.MOCK_SESSIONS);
   if (!data) {

@@ -49,11 +49,37 @@ export function clearGitHubToken(): void {
 /**
  * Octokit 클라이언트 인스턴스 팩토리
  */
-export function getOctokitClient(): Octokit {
-  const token = getGitHubToken();
+export function getOctokitClient(overrideToken?: string): Octokit {
+  const token = overrideToken !== undefined ? overrideToken : getGitHubToken();
   return new Octokit({
     auth: token || undefined,
   });
+}
+
+/**
+ * GitHub 토큰 유효성 검증
+ */
+export async function verifyGitHubToken(tokenInput?: string): Promise<{ success: boolean; username?: string; message: string }> {
+  const token = tokenInput !== undefined ? tokenInput.trim() : getGitHubToken();
+  if (!token) {
+    return { success: false, message: 'GitHub 토큰이 입력되지 않았음' };
+  }
+
+  try {
+    const octokit = getOctokitClient(token);
+    const userRes = await octokit.rest.users.getAuthenticated();
+    return {
+      success: true,
+      username: userRes.data.login,
+      message: `GitHub 인증 성공 (계정: ${userRes.data.login})`,
+    };
+  } catch (err: any) {
+    const status = err?.status || err?.response?.status;
+    if (status === 401) {
+      return { success: false, message: '유효하지 않거나 만료된 GitHub 토큰임' };
+    }
+    return { success: false, message: `GitHub 토큰 검증 실패: ${err?.message || '알 수 없는 오류'}` };
+  }
 }
 
 /**

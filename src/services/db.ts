@@ -36,8 +36,8 @@ export function openDB(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => {
-      console.error('IndexedDB 열기 실패:', request.error);
-      reject(request.error);
+      console.warn('IndexedDB 열기 실패 (폴백 처리):', request.error);
+      reject(request.error || new Error('IndexedDB 열기 실패'));
     };
 
     request.onsuccess = () => {
@@ -87,11 +87,16 @@ export async function getSessionsFromDB(): Promise<any[]> {
   try {
     const db = await openDB();
     return new Promise((resolve) => {
-      const tx = db.transaction('sessions', 'readonly');
-      const store = tx.objectStore('sessions');
-      const request = store.getAll();
-      request.onsuccess = () => resolve(request.result || []);
-      request.onerror = () => resolve([]);
+      try {
+        const tx = db.transaction('sessions', 'readonly');
+        const store = tx.objectStore('sessions');
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => resolve([]);
+      } catch (err) {
+        console.warn('IndexedDB 세션 트랜잭션 실패:', err);
+        resolve([]);
+      }
     });
   } catch (err) {
     console.warn('IndexedDB 세션 불러오기 실패:', err);
