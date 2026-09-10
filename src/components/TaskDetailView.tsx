@@ -4,8 +4,9 @@ import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { ScrollArea } from './ui/ScrollArea';
 import { ChangedFilesView } from './ChangedFilesView';
-import { JulesSession, approveJulesPlan, sendJulesMessage } from '../services/julesApi';
+import { JulesSession } from '../services/julesApi';
 import { getRepoLinks } from '../services/githubApi';
+import { useApproveJulesPlanMutation, useSendJulesMessageMutation } from '../hooks/useJulesQueries';
 
 export interface TaskDetailViewProps {
   session: JulesSession;
@@ -21,7 +22,11 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'timeline' | 'files'>('timeline');
   const [inputMsg, setInputMsg] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const approvePlanMutation = useApproveJulesPlanMutation();
+  const sendMessageMutation = useSendJulesMessageMutation();
+
+  const isSubmitting = approvePlanMutation.isPending || sendMessageMutation.isPending;
 
   // ESC 키 눌렀을 때 세션 상세 닫기/뒤로가기
   React.useEffect(() => {
@@ -51,14 +56,11 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   const planSteps = Array.isArray(session.plan) ? session.plan : [];
 
   const handleApprove = async () => {
-    setIsSubmitting(true);
     try {
-      const updated = await approveJulesPlan(session.id);
+      const updated = await approvePlanMutation.mutateAsync(session.id);
       onUpdateSession(updated);
     } catch (err) {
       console.error(err);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -66,15 +68,15 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
     e.preventDefault();
     if (!inputMsg.trim() || isSubmitting) return;
 
-    setIsSubmitting(true);
     try {
-      const updated = await sendJulesMessage(session.id, inputMsg.trim());
+      const updated = await sendMessageMutation.mutateAsync({
+        sessionId: session.id,
+        message: inputMsg.trim(),
+      });
       onUpdateSession(updated);
       setInputMsg('');
     } catch (err) {
       console.error(err);
-    } finally {
-      setIsSubmitting(false);
     }
   };
 

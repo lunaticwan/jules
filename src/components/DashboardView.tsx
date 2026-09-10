@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Settings, Plus, RefreshCw, Terminal, Clock, AlertCircle, CheckCircle2, Search, Moon, Sun, Filter, GitBranch, Globe } from 'lucide-react';
 import { SessionCard } from './SessionCard';
 import { JulesSession } from '../services/julesApi';
-import { getGitHubToken, fetchUserRepositories, getRepoLinks } from '../services/githubApi';
+import { getGitHubToken, getRepoLinks } from '../services/githubApi';
+import { useUserRepositoriesQuery } from '../hooks/useGitHubQueries';
 import { useTheme } from '../context/ThemeContext';
 
 export interface DashboardViewProps {
@@ -35,19 +36,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const { theme, toggleTheme } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'IN_PROGRESS' | 'AWAITING_APPROVAL' | 'COMPLETED'>('ALL');
-  const [userRepos, setUserRepos] = useState<string[]>([]);
 
   const githubToken = getGitHubToken();
-
-  useEffect(() => {
-    if (githubToken) {
-      fetchUserRepositories().then((repos) => {
-        if (repos && repos.length > 0) {
-          setUserRepos(repos);
-        }
-      });
-    }
-  }, [githubToken]);
+  const { data: userRepos = [] } = useUserRepositoriesQuery();
 
   // 세션 목록 내 레포지토리와 GitHub API에서 받아온 레포지토리 합집합
   const allRepos = Array.from(

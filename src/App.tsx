@@ -1,10 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  fetchJulesSessions,
-  approveJulesPlan,
-  JulesSession,
-  getJulesApiKey,
-} from './services/julesApi';
+import { JulesSession, getJulesApiKey } from './services/julesApi';
+import { useJulesSessionsQuery, useApproveJulesPlanMutation } from './hooks/useJulesQueries';
 import { OnboardingModal } from './components/OnboardingModal';
 import { DashboardView } from './components/DashboardView';
 import { TaskDetailView } from './components/TaskDetailView';
@@ -12,29 +8,18 @@ import { NewTaskSheet } from './components/NewTaskSheet';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function App() {
-  const [sessions, setSessions] = useState<JulesSession[]>([]);
-  const [selectedSession, setSelectedSession] = useState<JulesSession | null>(null);
+  const { data: sessions = [], isLoading, refetch } = useJulesSessionsQuery();
+  const approvePlanMutation = useApproveJulesPlanMutation();
+
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedRepo, setSelectedRepo] = useState<string>('ALL');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isInitialOnboarding, setIsInitialOnboarding] = useState<boolean>(false);
 
-  const loadSessions = async () => {
-    setIsLoading(true);
-    try {
-      const list = await fetchJulesSessions();
-      setSessions(list);
-      return list;
-    } catch (err) {
-      console.error(err);
-      return [];
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const selectedSession = sessions.find((s) => s.id === selectedSessionId || s.name === selectedSessionId) || null;
 
-  // URL Query / Hash 파라미터 기반 라우트 상태 읽기 및 동기화
+  // URL Query 파라미터 기반 라우트 상태 읽기 및 동기화
   const syncRouteFromUrl = (sessionList: JulesSession[]) => {
     const params = new URLSearchParams(window.location.search);
     const sessionParam = params.get('session');
@@ -47,7 +32,7 @@ export default function App() {
     if (sessionParam) {
       const found = sessionList.find((s) => s.id === sessionParam || s.name === sessionParam);
       if (found) {
-        setSelectedSession(found);
+        setSelectedSessionId(found.id);
       }
     }
   };
@@ -76,27 +61,22 @@ export default function App() {
       setIsInitialOnboarding(true);
       setIsSettingsOpen(true);
     }
+  }, []);
 
-    loadSessions().then((list) => {
-      syncRouteFromUrl(list);
-    });
+  useEffect(() => {
+    if (sessions.length > 0) {
+      syncRouteFromUrl(sessions);
+    }
+  }, [sessions]);
 
+  useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const sessionParam = params.get('session');
       const repoParam = params.get('repo');
 
       setSelectedRepo(repoParam || 'ALL');
-
-      if (sessionParam) {
-        setSessions((currentSessions) => {
-          const found = currentSessions.find((s) => s.id === sessionParam || s.name === sessionParam);
-          setSelectedSession(found || null);
-          return currentSessions;
-        });
-      } else {
-        setSelectedSession(null);
-      }
+      setSelectedSessionId(sessionParam || null);
     };
 
     window.addEventListener('popstate', handlePopState);
@@ -104,36 +84,31 @@ export default function App() {
   }, []);
 
   const handleSelectSession = (session: JulesSession | null) => {
-    setSelectedSession(session);
-    updateUrlParams(session ? session.id : null, selectedRepo);
+    const nextId = session ? session.id : null;
+    setSelectedSessionId(nextId);
+    updateUrlParams(nextId, selectedRepo);
   };
 
   const handleRepoSelect = (repo: string) => {
     setSelectedRepo(repo);
-    updateUrlParams(selectedSession ? selectedSession.id : null, repo);
+    updateUrlParams(selectedSessionId, repo);
   };
 
   const handleApprovePlan = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const updated = await approveJulesPlan(sessionId);
-      setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-      if (selectedSession && selectedSession.id === updated.id) {
-        setSelectedSession(updated);
-      }
+      await approvePlanMutation.mutateAsync(sessionId);
     } catch (err) {
-      console.error(err);
+      console.error('플랜 승인 실패:', err);
     }
   };
 
   const handleSessionCreated = (newSession: JulesSession) => {
-    setSessions((prev) => [newSession, ...prev]);
     handleSelectSession(newSession);
   };
 
-  const handleUpdateSession = (updated: JulesSession) => {
-    setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-    setSelectedSession(updated);
+  const handleUpdateSession = (_updated: JulesSession) => {
+    // React Query Query Invalidation에 의해 자동으로 최신화됨
   };
 
   const existingRepos = Array.from(new Set(sessions.map((s) => s.repository)));
@@ -147,13 +122,13 @@ export default function App() {
           <DashboardView
             sessions={sessions}
             selectedRepo={selectedRepo}
-            selectedSessionId={selectedSession ? (selectedSession as JulesSession).id : undefined}
+            selectedSessionId={selectedSessionId || undefined}
             onRepoSelect={handleRepoSelect}
             onSelectSession={handleSelectSession}
             onApprovePlan={handleApprovePlan}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenNewTask={() => setIsNewTaskOpen(true)}
-            onRefresh={loadSessions}
+            onRefresh={() => refetch()}
             onSessionCreated={handleSessionCreated}
             isLoading={isLoading}
             isCompactView
@@ -208,7 +183,7 @@ export default function App() {
               onApprovePlan={handleApprovePlan}
               onOpenSettings={() => setIsSettingsOpen(true)}
               onOpenNewTask={() => setIsNewTaskOpen(true)}
-              onRefresh={loadSessions}
+              onRefresh={() => refetch()}
               onSessionCreated={handleSessionCreated}
               isLoading={isLoading}
             />
@@ -224,7 +199,7 @@ export default function App() {
           setIsInitialOnboarding(false);
         }}
         onSaveSuccess={() => {
-          loadSessions();
+          refetch();
         }}
         isInitialOnboarding={isInitialOnboarding}
       />
