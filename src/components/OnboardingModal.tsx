@@ -24,6 +24,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [showGithubToken, setShowGithubToken] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [verifyMsg, setVerifyMsg] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -44,8 +45,6 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
     if (onSaveSuccess) onSaveSuccess();
     onClose();
   };
-
-  const [isVerifying, setIsVerifying] = useState(false);
 
   const handleTestConnection = async () => {
     setIsVerifying(true);
