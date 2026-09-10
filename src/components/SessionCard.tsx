@@ -4,13 +4,23 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { JulesSession } from '../services/julesApi';
 
+/**
+ * 대시보드 테이블 단일 세션 행(Row) 컴포넌트 프롭스
+ */
 export interface SessionCardProps {
+  /** Jules 작업 세션 데이터 */
   session: JulesSession;
+  /** 현재 선택된 행 여부 */
   isSelected?: boolean;
+  /** 세션 선택 클릭 핸들러 */
   onSelect: (session: JulesSession) => void;
+  /** 세션 플랜 1-Click 승인 이벤트 핸들러 */
   onApprovePlan: (sessionId: string, e: React.MouseEvent) => void;
 }
 
+/**
+ * 고밀도 대시보드 스프레드시트 테이블의 개별 세션 데이터 행 컴포넌트
+ */
 export const SessionCard: React.FC<SessionCardProps> = React.memo(({
   session,
   isSelected = false,
@@ -19,6 +29,9 @@ export const SessionCard: React.FC<SessionCardProps> = React.memo(({
 }) => {
   const isAwaitingApproval = session.state === 'AWAITING_APPROVAL';
 
+  /**
+   * 세션 상태별 시각적 배지 컴포넌트 생성
+   */
   const getStatusBadge = () => {
     switch (session.state) {
       case 'IN_PROGRESS':
@@ -47,6 +60,9 @@ export const SessionCard: React.FC<SessionCardProps> = React.memo(({
     }
   };
 
+  /**
+   * ISO 일시를 경과 상대 시간 텍스트로 전환
+   */
   const getRelativeTime = (isoString?: string) => {
     if (!isoString) return '방금';
     const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);

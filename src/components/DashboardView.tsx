@@ -6,22 +6,41 @@ import { getGitHubToken, getRepoLinks } from '../services/githubApi';
 import { useUserRepositoriesQuery } from '../hooks/useGitHubQueries';
 import { useTheme } from '../context/ThemeContext';
 
+/**
+ * 대시보드 뷰 컴포넌트 프롭스 인터페이스
+ */
 export interface DashboardViewProps {
+  /** Jules 작업 세션 전체 목록 */
   sessions: JulesSession[];
+  /** 선택된 레포지토리 필터 ('ALL' 또는 저장소 이름) */
   selectedRepo: string;
+  /** 현재 활성화된 세션 ID */
   selectedSessionId?: string;
+  /** 저장소 선택 변경 핸들러 */
   onRepoSelect: (repo: string) => void;
+  /** 특정 세션 선택 핸들러 */
   onSelectSession: (session: JulesSession) => void;
+  /** 세션 플랜 1-Click 승인 핸들러 */
   onApprovePlan: (sessionId: string, e: React.MouseEvent) => void;
+  /** 설정 모달 오픈 핸들러 */
   onOpenSettings: () => void;
+  /** 신규 태스크 모달 오픈 핸들러 */
   onOpenNewTask: () => void;
+  /** 데이터 새로고침 핸들러 */
   onRefresh: () => void;
+  /** 키보드 단축키 모달 오픈 핸들러 */
   onOpenShortcuts?: () => void;
+  /** 세션 생성 완료 후 콜백 */
   onSessionCreated?: (session: JulesSession) => void;
+  /** 데이터 로딩 상태 */
   isLoading?: boolean;
+  /** 스플릿 뷰 축소 표시 여부 */
   isCompactView?: boolean;
 }
 
+/**
+ * JulesPWA 고밀도 테이블 및 작업 세션 대시보드 컴포넌트
+ */
 export const DashboardView: React.FC<DashboardViewProps> = ({
   sessions,
   selectedRepo,
@@ -45,10 +64,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const githubToken = getGitHubToken();
   const { data: userRepos = [] } = useUserRepositoriesQuery();
 
-  // 글로벌 키보드 단축키 핸들러
+  /**
+   * 글로벌 키보드 단축키 핸들러 등록
+   */
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Input/Textarea 입력 중이면 단축키 비활성화
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return;
@@ -73,7 +93,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onOpenNewTask, onRefresh, onOpenShortcuts]);
 
-  // 세션 목록 내 레포지토리와 GitHub API 레포지토리 합집합
+  /**
+   * 세션 데이터 및 GitHub API 기반 사용 가능 저장소 목록 계산
+   */
   const allRepos = useMemo(() => {
     return Array.from(
       new Set([
@@ -83,7 +105,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     );
   }, [sessions, userRepos]);
 
-  // 요약 카운트 메모이제이션
+  /**
+   * 상태별 세션 수 카운트 계산
+   */
   const { inProgressCount, awaitingApprovalCount, completedCount } = useMemo(() => {
     return {
       inProgressCount: sessions.filter((s) => s.state === 'IN_PROGRESS').length,
@@ -92,7 +116,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
   }, [sessions]);
 
-  // 필터링 및 정렬된 세션 목록 메모이제이션
+  /**
+   * 검색어, 저장소, 상태 및 정렬 기준에 따른 최종 세션 목록
+   */
   const sortedAndFilteredSessions = useMemo(() => {
     const filtered = sessions.filter((s) => {
       const matchesRepo = selectedRepo === 'ALL' || s.repository === selectedRepo;
@@ -113,11 +139,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       if (sortOrder === 'REPO') {
         return (a.repository || '').localeCompare(b.repository || '');
       }
-      // NEWEST (기본값)
       return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
     });
   }, [sessions, selectedRepo, statusFilter, searchQuery, sortOrder]);
 
+  /**
+   * 검색 및 필터링 조건 초기화 핸들러
+   */
   const handleClearFilters = useCallback(() => {
     setSearchQuery('');
     setStatusFilter('ALL');
@@ -185,9 +213,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* 업무용 단일 통합 툴바 */}
       <div className="p-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 space-y-1.5">
-        {/* Repo Select & Search & Sort */}
         <div className="flex flex-col sm:flex-row gap-1.5 items-stretch sm:items-center">
-          {/* Repository Dropdown Select */}
           <div className="relative shrink-0 w-full sm:w-auto min-w-[160px]">
             <select
               value={selectedRepo}
@@ -207,7 +233,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <Filter className="absolute right-2 top-1.5 h-3 w-3 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* Search Input with Hotkey trigger */}
           <div className="relative flex-1">
             <Search className="absolute left-2 top-1.5 h-3.5 w-3.5 text-slate-400" />
             <input
@@ -232,7 +257,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </div>
 
-          {/* Sort Select */}
           <div className="relative shrink-0 w-full sm:w-auto">
             <select
               value={sortOrder}
@@ -247,7 +271,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Selected Repo Quick Links */}
         {selectedRepo !== 'ALL' && (
           <div className="flex items-center justify-between text-xs bg-blue-50/60 dark:bg-blue-950/40 px-2 py-1 rounded-md border border-blue-200/80 dark:border-blue-900/50">
             <span className="font-bold text-blue-700 dark:text-blue-300 font-mono text-[11px] break-all">
@@ -277,7 +300,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         )}
 
-        {/* Status Filter Indicator Pills */}
         <div className="flex items-center gap-1 overflow-x-auto pt-0.5 no-scrollbar">
           <button
             onClick={() => setStatusFilter('ALL')}
@@ -328,7 +350,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Dense Spreadsheet Table View */}
       <div className="p-1 overflow-x-auto">
         {sortedAndFilteredSessions.length === 0 ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-8 text-center text-slate-500 dark:text-slate-400">
@@ -370,7 +391,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         )}
       </div>
 
-      {/* Quick Add Floating Button */}
       <button
         onClick={onOpenNewTask}
         className="fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-500 active:scale-95 transition-all"
