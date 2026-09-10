@@ -1,44 +1,75 @@
 import { julesClient } from './apiClient';
 
-// Google Jules REST API 서비스
-
+/**
+ * Jules 대화 타임라인 내 단일 메시지 인터페이스
+ */
 export interface JulesMessage {
+  /** 메시지 고유 식별자 */
   id: string;
+  /** 메시지 발신자 유형 ('user' | 'jules' | 'system') */
   sender: 'user' | 'jules' | 'system';
+  /** 메시지본문 텍스트 */
   content: string;
+  /** ISO 8601 생성 일시 */
   timestamp: string;
+  /** 메시지 표시 분류 타입 */
   type?: 'text' | 'thought' | 'plan' | 'step';
 }
 
+/**
+ * Jules 작업 세션 실행 플랜의 단계 항목
+ */
 export interface JulesPlanStep {
+  /** 플랜 단계 순서 인덱스 */
   index: number;
+  /** 플랜 단계 요약 제목 */
   title: string;
+  /** 상세 동작 설명 */
   description?: string;
+  /** 실행 상태 ('pending' | 'in_progress' | 'completed' | 'failed') */
   status: 'pending' | 'in_progress' | 'completed' | 'failed';
 }
 
+/**
+ * Jules REST API 통합 작업 세션 데이터 인터페이스
+ */
 export interface JulesSession {
+  /** 세션 단축 ID (예: 'sess-101') */
   id: string;
-  name: string; // e.g. sessions/12345
-  repository: string; // e.g. owner/repo
+  /** 세션 리소스 Full Path (예: 'sessions/12345') */
+  name: string;
+  /** GitHub 저장소 식별자 (예: 'owner/repo') */
+  repository: string;
+  /** 기준 브랜치 (기본값: 'main') */
   baseBranch: string;
+  /** 사용자 원본 프롬프트 지시사항 */
   prompt: string;
+  /** 세션 현재 상태 */
   state: 'IN_PROGRESS' | 'AWAITING_APPROVAL' | 'COMPLETED' | 'FAILED';
+  /** 생성 일시 (ISO 8601) */
   createdAt: string;
+  /** 최근 업데이트 일시 (ISO 8601) */
   updatedAt: string;
+  /** 요약 타이틀 */
   title?: string;
+  /** 생성된 GitHub PR URL */
   prUrl?: string;
+  /** 생성된 GitHub PR 번호 */
   prNumber?: number;
+  /** 실행 플랜 단계 목록 */
   plan?: JulesPlanStep[];
+  /** 대화 타임라인 메시지 목록 */
   messages: JulesMessage[];
 }
 
 const STORAGE_KEYS = {
   JULES_KEY: 'jules_api_key',
   MOCK_SESSIONS: 'jules_mock_sessions',
-};
+} as const;
 
-// 기본 샘플 데이터 (초기 데모용)
+/**
+ * 기본 모의 세션 시드 데이터 (초기 데모 및 백업용)
+ */
 const INITIAL_MOCK_SESSIONS: JulesSession[] = [
   {
     id: 'sess-101',
@@ -55,7 +86,7 @@ const INITIAL_MOCK_SESSIONS: JulesSession[] = [
     plan: [
       { index: 1, title: 'index.css 내 safe-area CSS 클래스 작성', status: 'completed' },
       { index: 2, title: '하단 액션 바 컴포넌트 여백 수정', status: 'completed' },
-      { index: 3, title: 'iOS Safari 실기기 뷰포트 검증', status: 'in_progress' }
+      { index: 3, title: 'iOS Safari 실기기 뷰포트 검증', status: 'in_progress' },
     ],
     messages: [
       {
@@ -63,23 +94,23 @@ const INITIAL_MOCK_SESSIONS: JulesSession[] = [
         sender: 'user',
         content: '다크 모드 가시성 개선 및 safe-area 패딩 버그 수정 요청',
         timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-        type: 'text'
+        type: 'text',
       },
       {
         id: 'm2',
         sender: 'jules',
         content: '요청 사항을 분석하고 작업 계획을 수립했습니다. 하단 영역 safe-area 패딩 스타일을 적용합니다.',
         timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-        type: 'thought'
+        type: 'thought',
       },
       {
         id: 'm3',
         sender: 'jules',
         content: '제안된 수정 플랜의 승인을 기다리는 중입니다.',
         timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-        type: 'plan'
-      }
-    ]
+        type: 'plan',
+      },
+    ],
   },
   {
     id: 'sess-102',
@@ -95,7 +126,7 @@ const INITIAL_MOCK_SESSIONS: JulesSession[] = [
     prNumber: 108,
     plan: [
       { index: 1, title: 'auth_test.go 파일 내 Mock 저장소 추가', status: 'completed' },
-      { index: 2, title: '만료 토큰 케이스 테스트 작성', status: 'in_progress' }
+      { index: 2, title: '만료 토큰 케이스 테스트 작성', status: 'in_progress' },
     ],
     messages: [
       {
@@ -103,16 +134,16 @@ const INITIAL_MOCK_SESSIONS: JulesSession[] = [
         sender: 'user',
         content: '사용자 인증 토큰 재발급 API 엔드포인트 단위 테스트 추가',
         timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-        type: 'text'
+        type: 'text',
       },
       {
         id: 'm11',
         sender: 'jules',
         content: '테스트 코드를 작성 중입니다.',
         timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-        type: 'thought'
-      }
-    ]
+        type: 'thought',
+      },
+    ],
   },
   {
     id: 'sess-103',
@@ -128,7 +159,7 @@ const INITIAL_MOCK_SESSIONS: JulesSession[] = [
     prNumber: 39,
     plan: [
       { index: 1, title: 'vite-plugin-pwa 패키지 설정', status: 'completed' },
-      { index: 2, title: '아이콘 및 Manifest 작성', status: 'completed' }
+      { index: 2, title: '아이콘 및 Manifest 작성', status: 'completed' },
     ],
     messages: [
       {
@@ -136,19 +167,22 @@ const INITIAL_MOCK_SESSIONS: JulesSession[] = [
         sender: 'user',
         content: 'Vite PWA 매니페스트 및 서비스 워커 연동 설정',
         timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-        type: 'text'
+        type: 'text',
       },
       {
         id: 'm21',
         sender: 'jules',
         content: '모든 PR 작업이 완료되고 머지되었습니다.',
         timestamp: new Date(Date.now() - 1000 * 60 * 60 * 20).toISOString(),
-        type: 'text'
-      }
-    ]
-  }
+        type: 'text',
+      },
+    ],
+  },
 ];
 
+/**
+ * LocalStorage에 저장된 Jules API 키를 안전하게 조회함
+ */
 export function getJulesApiKey(): string {
   try {
     return localStorage.getItem(STORAGE_KEYS.JULES_KEY) || '';
@@ -158,6 +192,9 @@ export function getJulesApiKey(): string {
   }
 }
 
+/**
+ * LocalStorage에 Jules API 키를 저장함
+ */
 export function setJulesApiKey(key: string): void {
   try {
     localStorage.setItem(STORAGE_KEYS.JULES_KEY, key.trim());
@@ -166,6 +203,9 @@ export function setJulesApiKey(key: string): void {
   }
 }
 
+/**
+ * LocalStorage에 저장된 Jules API 키를 삭제함
+ */
 export function clearJulesApiKey(): void {
   try {
     localStorage.removeItem(STORAGE_KEYS.JULES_KEY);
@@ -175,7 +215,7 @@ export function clearJulesApiKey(): void {
 }
 
 /**
- * Jules API Key 유효성 검증
+ * Jules REST API Key 엔드포인트 연결 검증 수행
  */
 export async function verifyJulesKey(keyInput?: string): Promise<{ success: boolean; message: string }> {
   const apiKey = keyInput !== undefined ? keyInput.trim() : getJulesApiKey();
@@ -185,7 +225,7 @@ export async function verifyJulesKey(keyInput?: string): Promise<{ success: bool
 
   try {
     const res = await julesClient.get('/sessions', {
-      params: { key: apiKey }
+      params: { key: apiKey },
     });
     if (res.status === 200) {
       return { success: true, message: 'Jules API 연결 검증 성공' };
@@ -202,6 +242,9 @@ export async function verifyJulesKey(keyInput?: string): Promise<{ success: bool
 
 let inMemorySessionsCache: JulesSession[] | null = null;
 
+/**
+ * 로컬 캐시/LocalStorage에 저장된 세션 목록을 반환함
+ */
 export function getStoredSessions(): JulesSession[] {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.MOCK_SESSIONS);
@@ -227,6 +270,9 @@ export function getStoredSessions(): JulesSession[] {
   return inMemorySessionsCache;
 }
 
+/**
+ * 세션 목록을 로컬 캐시 및 LocalStorage에 업데이트함
+ */
 export function saveStoredSessions(sessions: JulesSession[]): void {
   inMemorySessionsCache = sessions;
   try {
@@ -237,7 +283,7 @@ export function saveStoredSessions(sessions: JulesSession[]): void {
 }
 
 /**
- * Jules 세션 목록 가져오기 (Axios 클라이언트 활용, 실패 시 로컬 데이터 반환)
+ * Jules 세션 목록을 API에서 조회하고 미연동 시 로컬 캐시 데이터를 반환함
  */
 export async function fetchJulesSessions(): Promise<JulesSession[]> {
   const apiKey = getJulesApiKey();
@@ -249,7 +295,6 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
     const response = await julesClient.get('/sessions');
     const data = response.data;
     if (Array.isArray(data.sessions)) {
-      // Jules API 응답 규격 정형화
       return data.sessions.map((s: any, index: number) => ({
         id: s.id || s.name?.split('/')?.pop() || `session-${index}`,
         name: s.name || `sessions/session-${index}`,
@@ -274,7 +319,7 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
 }
 
 /**
- * 특정 Jules 세션 상세 정보 가져오기 (Axios 클라이언트 활용)
+ * 특정 Jules 세션의 상세 정보를 조회함
  */
 export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesSession | null> {
   const sessions = getStoredSessions();
@@ -297,7 +342,7 @@ export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesS
 }
 
 /**
- * 신규 Jules 세션 생성 (Axios 클라이언트 활용)
+ * 신규 Jules 태스크 작업 세션을 생성함
  */
 export async function createJulesSession(params: {
   repository: string;
@@ -318,7 +363,7 @@ export async function createJulesSession(params: {
     title: params.prompt.slice(0, 30) + (params.prompt.length > 30 ? '...' : ''),
     plan: [
       { index: 1, title: '요청 사항 분석 및 코드베이스 탐색', status: 'completed' },
-      { index: 2, title: '코드 수정 사항 생성', status: 'in_progress' }
+      { index: 2, title: '코드 수정 사항 생성', status: 'in_progress' },
     ],
     messages: [
       {
@@ -326,16 +371,16 @@ export async function createJulesSession(params: {
         sender: 'user',
         content: params.prompt,
         timestamp: new Date().toISOString(),
-        type: 'text'
+        type: 'text',
       },
       {
         id: `m-${Date.now() + 1}`,
         sender: 'jules',
         content: '작업 요청을 접수했습니다. 코드베이스를 분석 중입니다.',
         timestamp: new Date().toISOString(),
-        type: 'thought'
-      }
-    ]
+        type: 'thought',
+      },
+    ],
   };
 
   if (apiKey) {
@@ -343,7 +388,7 @@ export async function createJulesSession(params: {
       const response = await julesClient.post('/sessions', {
         repository: params.repository,
         baseBranch: params.baseBranch,
-        prompt: params.prompt
+        prompt: params.prompt,
       });
       if (response.data) {
         const combined = { ...newSession, ...response.data };
@@ -363,7 +408,7 @@ export async function createJulesSession(params: {
 }
 
 /**
- * 세션 플랜 승인
+ * Jules 작업 세션의 검토 대기 플랜을 승인함
  */
 export async function approveJulesPlan(sessionId: string): Promise<JulesSession> {
   const sessions = getStoredSessions();
@@ -376,14 +421,14 @@ export async function approveJulesPlan(sessionId: string): Promise<JulesSession>
       sender: 'user',
       content: '플랜을 승인합니다. 진행해주세요.',
       timestamp: new Date().toISOString(),
-      type: 'text'
+      type: 'text',
     });
     sessions[idx].messages.push({
       id: `m-${Date.now() + 1}`,
       sender: 'jules',
       content: '플랜 승인을 확인했습니다. 변경 사항 적용 작업을 시작합니다.',
       timestamp: new Date().toISOString(),
-      type: 'thought'
+      type: 'thought',
     });
     saveStoredSessions(sessions);
     return sessions[idx];
@@ -392,9 +437,12 @@ export async function approveJulesPlan(sessionId: string): Promise<JulesSession>
 }
 
 /**
- * 스마트 1-Click AI 액션 제안 생성 및 세션 자동 발주
+ * 1-Click AI 스캔 및 최적화 작업을 자동으로 발주함
  */
-export async function triggerQuickAiAction(repo: string, actionType: 'lint' | 'security' | 'perf' | 'test'): Promise<JulesSession> {
+export async function triggerQuickAiAction(
+  repo: string,
+  actionType: 'lint' | 'security' | 'perf' | 'test'
+): Promise<JulesSession> {
   const promptMap = {
     lint: '전체 코드베이스 ESLint/TypeScript 타입 체크 규칙 정형화 및 경고 수정을 위한 리팩토링 진행',
     security: '의존성 패키지 취약점 점검 및 보안 강화 업데이트 적용',
@@ -410,7 +458,7 @@ export async function triggerQuickAiAction(repo: string, actionType: 'lint' | 's
 }
 
 /**
- * 메시지 전송 / 수정 요청
+ * 진행 중인 Jules 세션에 추가 피드백 메시지를 전송함
  */
 export async function sendJulesMessage(sessionId: string, message: string): Promise<JulesSession> {
   const sessions = getStoredSessions();
@@ -422,14 +470,14 @@ export async function sendJulesMessage(sessionId: string, message: string): Prom
       sender: 'user',
       content: message,
       timestamp: new Date().toISOString(),
-      type: 'text'
+      type: 'text',
     });
     sessions[idx].messages.push({
       id: `m-${Date.now() + 1}`,
       sender: 'jules',
       content: `피드백을 반영하겠습니다: "${message}"`,
       timestamp: new Date().toISOString(),
-      type: 'thought'
+      type: 'thought',
     });
     saveStoredSessions(sessions);
     return sessions[idx];

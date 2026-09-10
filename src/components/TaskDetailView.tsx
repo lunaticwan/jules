@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ExternalLink, Send, CheckCircle2, Bot, User, Check, GitPullRequest, FileText, MessageSquare, GitBranch, Globe } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Send, CheckCircle2, Bot, User, Check, GitPullRequest, FileText, MessageSquare, GitBranch, Globe, Copy, Sparkles } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { ScrollArea } from './ui/ScrollArea';
+import { Toast } from './ui/Toast';
 import { ChangedFilesView } from './ChangedFilesView';
 import { JulesSession } from '../services/julesApi';
 import { getRepoLinks } from '../services/githubApi';
@@ -23,6 +24,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   const [activeTab, setActiveTab] = useState<'timeline' | 'files'>('timeline');
   const [inputMsg, setInputMsg] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const approvePlanMutation = useApproveJulesPlanMutation();
   const sendMessageMutation = useSendJulesMessageMutation();
@@ -61,6 +63,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
     try {
       const updated = await approvePlanMutation.mutateAsync(session.id);
       onUpdateSession(updated);
+      setToastMessage('플랜이 승인되었습니다.');
     } catch (err: any) {
       setActionError(`플랜 승인 실패: ${err?.message || '알 수 없는 오류 발생'}`);
     }
@@ -78,13 +81,58 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
       });
       onUpdateSession(updated);
       setInputMsg('');
+      setToastMessage('메시지가 전송되었습니다.');
     } catch (err: any) {
       setActionError(`메시지 전송 실패: ${err?.message || '알 수 없는 오류 발생'}`);
     }
   };
 
+  /**
+   * LLM 개발 친화적 콘텍스트 Markdown 익스포터
+   */
+  const handleExportLLMContext = () => {
+    const formattedMarkdown = `
+# [LLM Context Export] ${session.title || session.prompt}
+
+## 1. 세션 메타데이터
+- **Session ID**: \`${session.id}\`
+- **Repository**: \`${session.repository}\`
+- **Base Branch**: \`${session.baseBranch || 'main'}\`
+- **Current State**: \`${session.state}\`
+${session.prUrl ? `- **Pull Request**: [PR #${session.prNumber}](${session.prUrl})` : ''}
+
+## 2. 작업 목표 및 프롬프트
+\`\`\`
+${session.prompt}
+\`\`\`
+
+## 3. 실행 플랜 (Plan Steps)
+${planSteps.length > 0
+  ? planSteps.map((step) => `- [${step.status === 'completed' ? 'x' : ' '}] ${step.title}`).join('\n')
+  : '등록된 플랜 단계 없음'}
+
+## 4. 메시지 및 프롬프트 타임라인
+${messages.length > 0
+  ? messages.map((m) => `### [${m.sender.toUpperCase()}] (${m.type || 'message'})\n${m.content}`).join('\n\n')
+  : '메시지 내역 없음'}
+`.trim();
+
+    navigator.clipboard.writeText(formattedMarkdown).then(() => {
+      setToastMessage('LLM 포맷 콘텍스트가 클립보드에 복사되었습니다.');
+    }).catch(() => {
+      setActionError('클립보드 복사에 실패했습니다.');
+    });
+  };
+
   return (
     <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+      <Toast
+        isOpen={!!toastMessage}
+        message={toastMessage || ''}
+        type="success"
+        onClose={() => setToastMessage(null)}
+      />
+
       {/* Header */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-3 py-2 backdrop-blur-md safe-pt shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -131,44 +179,59 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
           </div>
         </div>
 
-        {session.prUrl && (
-          <a
-            href={session.prUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1 rounded-md bg-purple-100 dark:bg-purple-950/80 border border-purple-300 dark:border-purple-800 px-2 py-0.5 text-xs font-semibold text-purple-700 dark:text-purple-300 shrink-0 ml-2"
-          >
-            <GitPullRequest className="h-3.5 w-3.5" />
-            PR #{session.prNumber}
-            <ExternalLink className="h-3 w-3" />
-          </a>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {session.prUrl && (
+            <a
+              href={session.prUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 rounded-md bg-purple-100 dark:bg-purple-950/80 border border-purple-300 dark:border-purple-800 px-2 py-0.5 text-xs font-semibold text-purple-700 dark:text-purple-300"
+            >
+              <GitPullRequest className="h-3.5 w-3.5" />
+              PR #{session.prNumber}
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
       </header>
 
-      {/* Detail Tab Navigation (타임라인 / 독립 분리된 변경 파일 보기) */}
-      <div className="flex border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1 shrink-0 gap-1.5">
-        <button
-          onClick={() => setActiveTab('timeline')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-            activeTab === 'timeline'
-              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
-        >
-          <MessageSquare className="h-3.5 w-3.5" />
-          타임라인 & 플랜
-        </button>
+      {/* Detail Tab Navigation & LLM Context Exporter Bar */}
+      <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1 shrink-0 gap-1.5">
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => setActiveTab('timeline')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              activeTab === 'timeline'
+                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            타임라인 & 플랜
+          </button>
 
+          <button
+            onClick={() => setActiveTab('files')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+              activeTab === 'files'
+                ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+            }`}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            변경 파일 보기 (온디맨드)
+          </button>
+        </div>
+
+        {/* LLM Context Exporter Button */}
         <button
-          onClick={() => setActiveTab('files')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-            activeTab === 'files'
-              ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-          }`}
+          onClick={handleExportLLMContext}
+          className="flex items-center gap-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-200 dark:border-indigo-800 px-2 py-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors"
+          title="LLM에 직접 제공할 프롬프트 콘텍스트 복사"
         >
-          <FileText className="h-3.5 w-3.5" />
-          변경 파일 보기 (온디맨드)
+          <Sparkles className="h-3 w-3 text-amber-500" />
+          <span>LLM 콘텍스트 복사</span>
+          <Copy className="h-3 w-3 ml-0.5" />
         </button>
       </div>
 

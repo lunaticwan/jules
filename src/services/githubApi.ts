@@ -1,26 +1,41 @@
 import { Octokit } from 'octokit';
 
-// GitHub REST API SDK 서비스 (Octokit 활용)
-
+/**
+ * GitHub Pull Request 상세 상태 객체
+ */
 export interface GitHubPRDetails {
+  /** PR 번호 */
   number: number;
+  /** PR 제목 */
   title: string;
+  /** PR 열림/열림 상태 ('open' | 'closed') */
   state: 'open' | 'closed';
+  /** 머지 여부 */
   merged: boolean;
+  /** GitHub 웹 PR 페이지 URL */
   html_url: string;
+  /** 작업 헤드 브랜치 명 */
   headBranch: string;
+  /** 타겟 베이스 브랜치 명 */
   baseBranch: string;
+  /** 최근 업데이트 일시 (ISO 8601) */
   updatedAt: string;
+  /** CI/CD 검사 결과 */
   checkStatus?: 'success' | 'failure' | 'pending';
 }
 
+/**
+ * 저장소 GitHub 상위 링크 객체
+ */
 export interface RepoLinks {
+  /** 저장소 GitHub 메인 웹 URL */
   repoUrl: string;
+  /** 저장소 GitHub Pages 서비스 URL */
   pagesUrl: string;
 }
 
 /**
- * 레포지토리 GitHub 웹 URL 및 GitHub Pages 배포 URL 생성
+ * 저장소명을 파싱하여 GitHub 레포지토리 및 Pages 서비스 URL을 생성함
  */
 export function getRepoLinks(repository: string): RepoLinks {
   const parts = repository.split('/');
@@ -32,8 +47,11 @@ export function getRepoLinks(repository: string): RepoLinks {
   };
 }
 
-const GITHUB_TOKEN_KEY = 'github_pat';
+const GITHUB_TOKEN_KEY = 'github_pat' as const;
 
+/**
+ * LocalStorage에서 GitHub Personal Access Token을 안전하게 로드함
+ */
 export function getGitHubToken(): string {
   try {
     return localStorage.getItem(GITHUB_TOKEN_KEY) || '';
@@ -43,6 +61,9 @@ export function getGitHubToken(): string {
   }
 }
 
+/**
+ * LocalStorage에 GitHub Personal Access Token을 저장함
+ */
 export function setGitHubToken(token: string): void {
   try {
     localStorage.setItem(GITHUB_TOKEN_KEY, token.trim());
@@ -51,6 +72,9 @@ export function setGitHubToken(token: string): void {
   }
 }
 
+/**
+ * LocalStorage에 저장된 GitHub Personal Access Token을 삭제함
+ */
 export function clearGitHubToken(): void {
   try {
     localStorage.removeItem(GITHUB_TOKEN_KEY);
@@ -60,7 +84,7 @@ export function clearGitHubToken(): void {
 }
 
 /**
- * Octokit 클라이언트 인스턴스 팩토리
+ * Octokit REST SDK 인스턴스를 생성하여 반환함
  */
 export function getOctokitClient(overrideToken?: string): Octokit {
   const token = overrideToken !== undefined ? overrideToken : getGitHubToken();
@@ -70,9 +94,11 @@ export function getOctokitClient(overrideToken?: string): Octokit {
 }
 
 /**
- * GitHub 토큰 유효성 검증
+ * GitHub PAT 인증 상태 및 사용자 계정을 검증함
  */
-export async function verifyGitHubToken(tokenInput?: string): Promise<{ success: boolean; username?: string; message: string }> {
+export async function verifyGitHubToken(
+  tokenInput?: string
+): Promise<{ success: boolean; username?: string; message: string }> {
   const token = tokenInput !== undefined ? tokenInput.trim() : getGitHubToken();
   if (!token) {
     return { success: false, message: 'GitHub 토큰이 입력되지 않았음' };
@@ -96,7 +122,7 @@ export async function verifyGitHubToken(tokenInput?: string): Promise<{ success:
 }
 
 /**
- * 사용자의 GitHub 레포지토리 목록 가져오기 (Octokit REST SDK 사용)
+ * 인증된 사용자의 GitHub 저장소 목록을 조회함
  */
 export async function fetchUserRepositories(): Promise<string[]> {
   const token = getGitHubToken();
@@ -119,7 +145,7 @@ export async function fetchUserRepositories(): Promise<string[]> {
 }
 
 /**
- * 특정 레포지토리의 Pull Request 상태 조회 (Octokit REST SDK 사용)
+ * 특정 PR의 라이브 상태 정보를 Octokit SDK로 조회함
  */
 export async function fetchGitHubPR(repo: string, prNumber: number): Promise<GitHubPRDetails | null> {
   const parts = repo.split('/');
@@ -153,6 +179,9 @@ export async function fetchGitHubPR(repo: string, prNumber: number): Promise<Git
   }
 }
 
+/**
+ * 저장소 배포 헬스 및 Pages 호스팅 상태 객체
+ */
 export interface RepoDeploymentHealth {
   repo: string;
   pagesDeployed: boolean;
@@ -162,7 +191,7 @@ export interface RepoDeploymentHealth {
 }
 
 /**
- * 특정 레포지토리의 GitHub Pages 배포 헬스 및 CI 체크 상태 통합 조회 (Octokit REST SDK 사용)
+ * GitHub Pages 배포 헬스 상태를 조회함
  */
 export async function fetchRepoDeploymentStatus(repo: string): Promise<RepoDeploymentHealth> {
   const links = getRepoLinks(repo);
@@ -203,7 +232,7 @@ export async function fetchRepoDeploymentStatus(repo: string): Promise<RepoDeplo
 }
 
 /**
- * CI/CD Check Runs 상태 조회 (Octokit REST SDK 사용)
+ * 특정 Ref에 대한 CI/CD Check Runs 실행 성공 여부를 조회함
  */
 export async function fetchCheckRuns(repo: string, ref: string): Promise<'success' | 'failure' | 'pending'> {
   const parts = repo.split('/');

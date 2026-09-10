@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, UseQueryResult, UseMutationResult } from '@tanstack/react-query';
 import {
   fetchJulesSessions,
   fetchJulesSessionDetail,
@@ -9,26 +9,33 @@ import {
   JulesSession,
 } from '../services/julesApi';
 
+/**
+ * Jules API React Query 키 상수 집합
+ */
 export const JULES_QUERY_KEYS = {
+  /** 전체 세션 목록 캐시 키 */
   sessions: ['julesSessions'] as const,
+  /** 특정 세션 상세 캐시 키 팩토리 */
   sessionDetail: (id: string) => ['julesSession', id] as const,
 };
 
 /**
- * Jules 세션 목록 Query Hook
+ * Jules 전체 세션 목록을 조회하는 React Query 커스텀 훅
  */
-export function useJulesSessionsQuery() {
+export function useJulesSessionsQuery(): UseQueryResult<JulesSession[], Error> {
   return useQuery<JulesSession[]>({
     queryKey: JULES_QUERY_KEYS.sessions,
     queryFn: fetchJulesSessions,
-    staleTime: 1000 * 30, // 30초 간 신선한 상태 유지
+    staleTime: 1000 * 30,
   });
 }
 
 /**
- * 특정 Jules 세션 상세 Query Hook
+ * 단일 Jules 세션의 상세 정보를 조회하는 React Query 커스텀 훅
  */
-export function useJulesSessionDetailQuery(sessionId: string | null | undefined) {
+export function useJulesSessionDetailQuery(
+  sessionId: string | null | undefined
+): UseQueryResult<JulesSession | null, Error> {
   return useQuery<JulesSession | null>({
     queryKey: JULES_QUERY_KEYS.sessionDetail(sessionId || ''),
     queryFn: () => (sessionId ? fetchJulesSessionDetail(sessionId) : Promise.resolve(null)),
@@ -37,9 +44,13 @@ export function useJulesSessionDetailQuery(sessionId: string | null | undefined)
 }
 
 /**
- * 신규 Jules 세션 생성 Mutation Hook
+ * 신규 Jules 태스크 세션을 생성하는 React Query Mutation 커스텀 훅
  */
-export function useCreateJulesSessionMutation() {
+export function useCreateJulesSessionMutation(): UseMutationResult<
+  JulesSession,
+  Error,
+  { repository: string; baseBranch: string; prompt: string }
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -55,9 +66,9 @@ export function useCreateJulesSessionMutation() {
 }
 
 /**
- * 플랜 승인 Mutation Hook
+ * 세션의 검토 대기 플랜을 승인하는 React Query Mutation 커스텀 훅
  */
-export function useApproveJulesPlanMutation() {
+export function useApproveJulesPlanMutation(): UseMutationResult<JulesSession, Error, string> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -72,9 +83,13 @@ export function useApproveJulesPlanMutation() {
 }
 
 /**
- * 세션 메시지 전송 Mutation Hook
+ * 세션 메시지/피드백을 전송하는 React Query Mutation 커스텀 훅
  */
-export function useSendJulesMessageMutation() {
+export function useSendJulesMessageMutation(): UseMutationResult<
+  JulesSession,
+  Error,
+  { sessionId: string; message: string }
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -90,9 +105,13 @@ export function useSendJulesMessageMutation() {
 }
 
 /**
- * 1-Click AI 스마트 작업 제안 Mutation Hook
+ * 1-Click AI 스캔/최적화 세션을 자동 발주하는 React Query Mutation 커스텀 훅
  */
-export function useQuickAiActionMutation() {
+export function useQuickAiActionMutation(): UseMutationResult<
+  JulesSession,
+  Error,
+  { repo: string; actionType: 'lint' | 'security' | 'perf' | 'test' }
+> {
   const queryClient = useQueryClient();
 
   return useMutation({
