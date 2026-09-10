@@ -1,4 +1,8 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { formatDistanceToNow } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { ArrowLeft, ExternalLink, Send, CheckCircle2, Bot, User, Check, GitPullRequest, FileText, MessageSquare, GitBranch, Globe, Copy } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -277,6 +281,16 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
               ) : (
                 messages.map((msg) => {
                   const isUser = msg.sender === 'user';
+                const formattedTime = msg.timestamp
+                  ? (() => {
+                      try {
+                        return formatDistanceToNow(new Date(msg.timestamp), { addSuffix: true, locale: ko });
+                      } catch {
+                        return '';
+                      }
+                    })()
+                  : '';
+
                   return (
                     <div
                       key={msg.id || `msg-${Math.random()}`}
@@ -291,20 +305,74 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                       </div>
 
                       <div
-                        className={`max-w-[82%] rounded-2xl p-3 text-xs leading-relaxed ${
+                      className={`max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${
                           isUser
                             ? 'bg-blue-600 text-white rounded-tr-none'
                             : msg.type === 'thought'
-                            ? 'bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60 rounded-tl-none italic'
+                          ? 'bg-slate-100 dark:bg-slate-800/90 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700/60 rounded-tl-none'
                             : 'bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-slate-700/60 rounded-tl-none shadow-sm'
                         }`}
                       >
                         {msg.type === 'thought' && (
-                          <div className="mb-1 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider not-italic">
+                        <div className="mb-1 text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
                             Thought Process
                           </div>
                         )}
-                        {msg.content}
+                      {isUser ? (
+                        <div className="whitespace-pre-wrap">{msg.content}</div>
+                      ) : (
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            pre({ children }) {
+                              return (
+                                <pre className="bg-slate-900 text-slate-100 p-2.5 rounded-lg overflow-x-auto text-xs font-mono my-2 border border-slate-800">
+                                  {children}
+                                </pre>
+                              );
+                            },
+                            code({ className, children, ...props }: any) {
+                              const match = /language-(\w+)/.exec(className || '');
+                              const isMultiLine = typeof children === 'string' && children.includes('\n');
+                              if (match || isMultiLine) {
+                                return (
+                                  <code className={`${className || ''} font-mono text-xs`} {...props}>
+                                    {children}
+                                  </code>
+                                );
+                              }
+                              return (
+                                <code className="bg-slate-200 dark:bg-slate-700 text-pink-600 dark:text-pink-300 px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                  {children}
+                                </code>
+                              );
+                            },
+                            p({ children }) {
+                              return <p className="mb-1 last:mb-0 leading-relaxed">{children}</p>;
+                            },
+                            ul({ children }) {
+                              return <ul className="list-disc list-inside space-y-0.5 my-1">{children}</ul>;
+                            },
+                            ol({ children }) {
+                              return <ol className="list-decimal list-inside space-y-0.5 my-1">{children}</ol>;
+                            },
+                            a({ href, children }) {
+                              return (
+                                <a href={href} target="_blank" rel="noreferrer" className="text-blue-500 underline hover:text-blue-400">
+                                  {children}
+                                </a>
+                              );
+                            },
+                          }}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                      )}
+                      {formattedTime && (
+                        <div className={`mt-1 text-[10px] ${isUser ? 'text-blue-200 text-right' : 'text-slate-400 dark:text-slate-500'}`}>
+                          {formattedTime}
+                        </div>
+                      )}
                       </div>
                     </div>
                   );

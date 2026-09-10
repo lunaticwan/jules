@@ -4,6 +4,19 @@ import { VitePWA } from 'vite-plugin-pwa';
 // Vite 및 PWA 플러그인 설정
 export default defineConfig({
     base: './',
+    build: {
+        chunkSizeWarningLimit: 600,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+                    'vendor-query': ['@tanstack/react-query', 'axios', 'octokit'],
+                    'vendor-markdown': ['react-markdown', 'remark-gfm'],
+                    'vendor-utils': ['zod', 'date-fns', 'diff', 'clsx', 'tailwind-merge', 'lucide-react'],
+                },
+            },
+        },
+    },
     plugins: [
         react(),
         VitePWA({

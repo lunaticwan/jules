@@ -1,4 +1,6 @@
 import React from 'react';
+import { formatDistanceToNow } from 'date-fns';
+import { ko } from 'date-fns/locale';
 import { ExternalLink, CheckCircle2, Clock, AlertCircle, ArrowRight, GitPullRequest } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -61,15 +63,17 @@ export const SessionCard: React.FC<SessionCardProps> = React.memo(({
   };
 
   /**
-   * ISO 일시를 경과 상대 시간 텍스트로 전환
+   * date-fns 기반 ISO 일시 경과 상대 시간 변환
    */
   const getRelativeTime = (isoString?: string) => {
-    if (!isoString) return '방금';
-    const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
-    if (diff < 60) return '방금';
-    if (diff < 3600) return `${Math.floor(diff / 60)}분`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-    return `${Math.floor(diff / 86400)}d`;
+    if (!isoString) return '방금 전';
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '방금 전';
+      return formatDistanceToNow(date, { addSuffix: true, locale: ko });
+    } catch {
+      return '방금 전';
+    }
   };
 
   return (

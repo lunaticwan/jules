@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { differenceInMinutes } from 'date-fns';
 import { Sparkles, TrendingUp, Zap, Code2, Globe, CheckCircle2, Play } from 'lucide-react';
 import { JulesSession } from '../services/julesApi';
 import { useRepoDeploymentStatusQuery } from '../hooks/useGitHubQueries';
@@ -32,6 +33,23 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
 
   const completed = sessions.filter((s) => s.state === 'COMPLETED').length;
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  // date-fns 기반 평균 세션 완료/작업 소요 시간(분) 정밀 계산
+  const avgDurationMinutes = useMemo(() => {
+    if (sessions.length === 0) return 12;
+    let totalMinutes = 0;
+    let validCount = 0;
+    sessions.forEach((s) => {
+      if (s.createdAt && s.updatedAt) {
+        const diff = differenceInMinutes(new Date(s.updatedAt), new Date(s.createdAt));
+        if (diff >= 0) {
+          totalMinutes += diff;
+          validCount++;
+        }
+      }
+    });
+    return validCount > 0 ? Math.max(1, Math.round(totalMinutes / validCount)) : 12;
+  }, [sessions]);
 
   // 저장소별 세션 분포
   const repoStats = sessions.reduce((acc, curr) => {
@@ -68,10 +86,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
           <div className="rounded-xl bg-white/80 dark:bg-slate-900/80 p-3 border border-slate-200/80 dark:border-slate-800">
             <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
               <Zap className="h-3.5 w-3.5 text-amber-500" />
-              평균 작업 시간
+              평균 작업 소요 시간
             </div>
             <p className="text-xl font-bold text-slate-900 dark:text-slate-100 mt-1">
-              ~ 12분
+              ~ {avgDurationMinutes}분
             </p>
           </div>
         </div>
