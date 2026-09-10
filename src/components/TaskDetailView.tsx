@@ -382,7 +382,11 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
           </>
         ) : (
           /* 독립 분리된 온디맨드 변경 파일 컴포넌트 */
-          <ChangedFilesView sessionId={session.id} />
+          <ChangedFilesView
+            sessionId={session.id}
+            repository={session.repository}
+            prNumber={session.prNumber}
+          />
         )}
       </ScrollArea>
 

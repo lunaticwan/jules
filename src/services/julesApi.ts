@@ -28,7 +28,7 @@ export const JulesPlanStepSchema = z.object({
 export const JulesSessionSchema = z.object({
   id: z.string(),
   name: z.string(),
-  repository: z.string().transform((val) => (!val || val === 'unknown/repository' ? 'acme/mobile-pwa' : val)).default('acme/mobile-pwa'),
+  repository: z.string().default(''),
   baseBranch: z.string().default('main'),
   prompt: z.string().default(''),
   state: z.enum(['IN_PROGRESS', 'AWAITING_APPROVAL', 'COMPLETED', 'FAILED']).default('IN_PROGRESS'),
@@ -50,25 +50,66 @@ export type JulesSession = z.infer<typeof JulesSessionSchema>;
  * 단일 세션 데이터 검증 및 보정 파서
  */
 export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'): JulesSession {
-  const result = JulesSessionSchema.safeParse(data);
-  if (result.success) {
-    return result.data;
-  }
-
+  console.log('[safeParseJulesSession] [INPUT_RAW_DATA]', data);
   const rawObj = typeof data === 'object' && data !== null ? (data as Record<string, any>) : {};
   const id = String(rawObj.id || rawObj.name?.split('/')?.pop() || fallbackId);
-  const prompt = String(rawObj.prompt || rawObj.title || '작업 요청 내용');
+  const prompt = String(rawObj.prompt || rawObj.title || rawObj.userPrompt || '작업 요청 내용');
 
-  let repo = String(rawObj.repository || rawObj.repo || 'acme/mobile-pwa');
+  // Jules API 응답 구조 및 일반 세션 데이터의 repository 필드 순차 검사
+  let repo = String(
+    rawObj.sourceContext?.source?.github?.repository ||
+      rawObj.repository ||
+      rawObj.repo ||
+      rawObj.githubRepository ||
+      ''
+  );
+
+  // 아무 정보도 없는 경우에만 폴백 적용
   if (!repo || repo === 'unknown/repository') {
-    repo = 'acme/mobile-pwa';
+    repo = 'owner/repository';
   }
 
-  return {
+  // Jules API activities / outputs / messages 필드 통합 파싱
+  let parsedMessages: JulesMessage[] = [];
+  if (Array.isArray(rawObj.messages) && rawObj.messages.length > 0) {
+    parsedMessages = rawObj.messages.map((m: any, i: number) => ({
+      id: String(m.id || `msg-${i}`),
+      sender: (['user', 'jules', 'system'].includes(m.sender) ? m.sender : 'jules') as JulesMessage['sender'],
+      content: String(m.content || m.text || ''),
+      timestamp: String(m.timestamp || m.createTime || new Date().toISOString()),
+      type: m.type,
+    }));
+  } else if (Array.isArray(rawObj.activities) && rawObj.activities.length > 0) {
+    parsedMessages = rawObj.activities.map((act: any, i: number) => ({
+      id: String(act.id || `act-${i}`),
+      sender: act.actor === 'USER' ? 'user' : 'jules',
+      content: String(act.message || act.description || act.summary || ''),
+      timestamp: String(act.createTime || new Date().toISOString()),
+      type: act.type || 'text',
+    }));
+  }
+
+  if (parsedMessages.length === 0) {
+    parsedMessages = [
+      {
+        id: `msg-${id}-1`,
+        sender: 'user',
+        content: prompt,
+        timestamp: String(rawObj.createdAt || rawObj.createTime || new Date().toISOString()),
+        type: 'text',
+      },
+    ];
+  }
+
+  // PR URL / PR Number 파싱 (pullRequest 또는 prUrl 또는 outputs)
+  const prUrl = rawObj.prUrl || rawObj.pullRequestUrl || rawObj.pullRequest?.htmlUrl || rawObj.outputs?.pullRequestUrl;
+  const prNumber = rawObj.prNumber || rawObj.pullRequestNumber || rawObj.pullRequest?.number || rawObj.outputs?.pullRequestNumber;
+
+  const parsedSession: JulesSession = {
     id,
     name: String(rawObj.name || `sessions/${id}`),
     repository: repo,
-    baseBranch: String(rawObj.baseBranch || 'main'),
+    baseBranch: String(rawObj.baseBranch || rawObj.sourceContext?.source?.github?.baseBranch || 'main'),
     prompt,
     state: (['IN_PROGRESS', 'AWAITING_APPROVAL', 'COMPLETED', 'FAILED'].includes(rawObj.state)
       ? rawObj.state
@@ -76,8 +117,8 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
     createdAt: String(rawObj.createdAt || rawObj.createTime || new Date().toISOString()),
     updatedAt: String(rawObj.updatedAt || rawObj.updateTime || new Date().toISOString()),
     title: String(rawObj.title || prompt || 'Untitled Session'),
-    prUrl: rawObj.prUrl || rawObj.pullRequestUrl || undefined,
-    prNumber: rawObj.prNumber || rawObj.pullRequestNumber || undefined,
+    prUrl: prUrl ? String(prUrl) : undefined,
+    prNumber: prNumber ? Number(prNumber) : undefined,
     plan: Array.isArray(rawObj.plan)
       ? rawObj.plan.map((p: any, i: number) => ({
           index: p.index || i + 1,
@@ -86,24 +127,11 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
           status: p.status || 'pending',
         }))
       : [],
-    messages: Array.isArray(rawObj.messages) && rawObj.messages.length > 0
-      ? rawObj.messages.map((m: any, i: number) => ({
-          id: String(m.id || `msg-${i}`),
-          sender: (['user', 'jules', 'system'].includes(m.sender) ? m.sender : 'jules') as JulesMessage['sender'],
-          content: String(m.content || ''),
-          timestamp: String(m.timestamp || new Date().toISOString()),
-          type: m.type,
-        }))
-      : [
-          {
-            id: `msg-${id}-1`,
-            sender: 'user',
-            content: prompt,
-            timestamp: new Date().toISOString(),
-            type: 'text',
-          },
-        ],
+    messages: parsedMessages,
   };
+
+  console.log('[safeParseJulesSession] [PARSED_RESULT]', parsedSession);
+  return parsedSession;
 }
 
 const STORAGE_KEYS = {
@@ -337,23 +365,31 @@ export function saveStoredSessions(sessions: JulesSession[]): void {
  */
 export async function fetchJulesSessions(): Promise<JulesSession[]> {
   const apiKey = getJulesApiKey();
+  console.log('[fetchJulesSessions] [API_KEY_PRESENT]', !!apiKey);
   if (!apiKey) {
-    return getStoredSessions();
+    const stored = getStoredSessions();
+    console.log('[fetchJulesSessions] [NO_KEY_FALLBACK_STORED]', stored);
+    return stored;
   }
 
   try {
+    console.log('[fetchJulesSessions] [SENDING_REQUEST] GET /sessions');
     const response = await julesClient.get('/sessions');
+    console.log('[fetchJulesSessions] [HTTP_RESPONSE_SUCCESS]', response.status, response.data);
     const data = response.data;
     if (Array.isArray(data.sessions)) {
       const mapped = data.sessions.map((s: any, index: number) => safeParseJulesSession(s, `session-${index}`));
+      console.log('[fetchJulesSessions] [MAPPED_SESSIONS]', mapped);
       saveStoredSessions(mapped);
       return mapped;
     }
-  } catch (err) {
-    console.warn('Jules API 호출 실패, 로컬 저장소 데이터 반환:', err);
+  } catch (err: any) {
+    console.error('[fetchJulesSessions] [API_ERROR]', err?.response?.status, err?.message, err?.response?.data || err);
   }
 
-  return getStoredSessions();
+  const fallback = getStoredSessions();
+  console.log('[fetchJulesSessions] [FALLBACK_STORED_SESSIONS]', fallback);
+  return fallback;
 }
 
 /**
@@ -361,19 +397,23 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
  */
 export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesSession | null> {
   const apiKey = getJulesApiKey();
+  console.log('[fetchJulesSessionDetail] [SESSION_ID]', sessionId, '[API_KEY_PRESENT]', !!apiKey);
   if (apiKey) {
     try {
+      console.log(`[fetchJulesSessionDetail] [SENDING_REQUEST] GET /${sessionId}`);
       const response = await julesClient.get(`/${sessionId}`);
+      console.log('[fetchJulesSessionDetail] [HTTP_RESPONSE_SUCCESS]', response.status, response.data);
       if (response.data) {
         return safeParseJulesSession(response.data, sessionId);
       }
-    } catch (err) {
-      console.warn('Jules 세션 상세 API 조회 실패, 로컬 세션 조회로 이동:', err);
+    } catch (err: any) {
+      console.error('[fetchJulesSessionDetail] [API_ERROR]', err?.response?.status, err?.message, err?.response?.data || err);
     }
   }
 
   const sessions = getStoredSessions();
   const found = sessions.find((s) => s.id === sessionId || s.name === sessionId);
+  console.log('[fetchJulesSessionDetail] [LOCAL_FOUND]', found);
   return found || null;
 }
 

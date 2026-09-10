@@ -47,6 +47,51 @@ export function getRepoLinks(repository: string): RepoLinks {
   };
 }
 
+/**
+ * 특정 PR의 변경 파일(files) 목록을 GitHub Octokit REST API로 조회함
+ */
+export async function fetchPRFiles(
+  repo: string,
+  prNumber: number
+): Promise<{ filepath: string; status: 'added' | 'modified' | 'deleted'; additions: number; deletions: number; patch?: string }[]> {
+  console.log('[fetchPRFiles] [INPUT]', { repo, prNumber });
+  const parts = repo.split('/');
+  const owner = parts[0];
+  const repoName = parts[1] || parts[0];
+
+  if (!owner || !repoName || !prNumber) {
+    console.warn('[fetchPRFiles] [INVALID_PARAMS]', { owner, repoName, prNumber });
+    return [];
+  }
+
+  try {
+    const octokit = getOctokitClient();
+    console.log('[fetchPRFiles] [OCTOKIT_REQUEST]', { owner, repo: repoName, pull_number: prNumber });
+    const response = await octokit.rest.pulls.listFiles({
+      owner,
+      repo: repoName,
+      pull_number: prNumber,
+      per_page: 100,
+    });
+
+    console.log('[fetchPRFiles] [OCTOKIT_RESPONSE_COUNT]', response.data?.length);
+    if (Array.isArray(response.data)) {
+      const mapped = response.data.map((f: any) => ({
+        filepath: f.filename,
+        status: (['added', 'deleted', 'modified'].includes(f.status) ? f.status : 'modified') as 'added' | 'modified' | 'deleted',
+        additions: f.additions || 0,
+        deletions: f.deletions || 0,
+        patch: f.patch,
+      }));
+      console.log('[fetchPRFiles] [MAPPED_FILES]', mapped);
+      return mapped;
+    }
+  } catch (err: any) {
+    console.error('[fetchPRFiles] [ERROR]', err?.status, err?.message, err);
+  }
+  return [];
+}
+
 const GITHUB_TOKEN_KEY = 'github_pat' as const;
 
 /**
