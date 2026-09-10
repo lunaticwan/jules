@@ -11,7 +11,7 @@ export interface SessionCardProps {
   onApprovePlan: (sessionId: string, e: React.MouseEvent) => void;
 }
 
-export const SessionCard: React.FC<SessionCardProps> = ({
+export const SessionCard: React.FC<SessionCardProps> = React.memo(({
   session,
   isSelected = false,
   onSelect,
@@ -110,4 +110,6 @@ export const SessionCard: React.FC<SessionCardProps> = ({
       </td>
     </tr>
   );
-};
+});
+
+SessionCard.displayName = 'SessionCard';

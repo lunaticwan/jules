@@ -1,11 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { JulesSession, getJulesApiKey } from './services/julesApi';
 import { useJulesSessionsQuery, useApproveJulesPlanMutation } from './hooks/useJulesQueries';
-import { OnboardingModal } from './components/OnboardingModal';
 import { DashboardView } from './components/DashboardView';
 import { TaskDetailView } from './components/TaskDetailView';
-import { NewTaskSheet } from './components/NewTaskSheet';
 import { ErrorBoundary } from './components/ErrorBoundary';
+
+// Code Splitting (Lazy Loading) 적용으로 초기 로딩 번들 크기 감소 및 렌더링 최적화
+const OnboardingModal = lazy(() =>
+  import('./components/OnboardingModal').then((module) => ({ default: module.OnboardingModal }))
+);
+const NewTaskSheet = lazy(() =>
+  import('./components/NewTaskSheet').then((module) => ({ default: module.NewTaskSheet }))
+);
+const KeyboardShortcutsModal = lazy(() =>
+  import('./components/KeyboardShortcutsModal').then((module) => ({ default: module.KeyboardShortcutsModal }))
+);
 
 export default function App() {
   const { data: sessions = [], isLoading, refetch } = useJulesSessionsQuery();
@@ -15,12 +24,15 @@ export default function App() {
   const [selectedRepo, setSelectedRepo] = useState<string>('ALL');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState<boolean>(false);
+  const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
   const [isInitialOnboarding, setIsInitialOnboarding] = useState<boolean>(false);
 
-  const selectedSession = sessions.find((s) => s.id === selectedSessionId || s.name === selectedSessionId) || null;
+  const selectedSession = useMemo(() => {
+    return sessions.find((s) => s.id === selectedSessionId || s.name === selectedSessionId) || null;
+  }, [sessions, selectedSessionId]);
 
   // URL Query 파라미터 기반 라우트 상태 읽기 및 동기화 (safe decode)
-  const syncRouteFromUrl = (sessionList: JulesSession[]) => {
+  const syncRouteFromUrl = useCallback((sessionList: JulesSession[]) => {
     try {
       const params = new URLSearchParams(window.location.search);
       const sessionParam = params.get('session');
@@ -40,10 +52,10 @@ export default function App() {
     } catch (err) {
       console.warn('URL 파라미터 디코딩 예외 방어:', err);
     }
-  };
+  }, []);
 
-  // URL 파라미터 업데이트 함수 (pushState 활용)
-  const updateUrlParams = (sessionId: string | null, repoId: string) => {
+  // URL 파라미터 업데이트 함수
+  const updateUrlParams = useCallback((sessionId: string | null, repoId: string) => {
     const url = new URL(window.location.href);
     if (sessionId) {
       url.searchParams.set('session', sessionId);
@@ -58,7 +70,7 @@ export default function App() {
     }
 
     window.history.pushState({}, '', url.toString());
-  };
+  }, []);
 
   useEffect(() => {
     const key = getJulesApiKey();
@@ -72,7 +84,7 @@ export default function App() {
     if (sessions.length > 0) {
       syncRouteFromUrl(sessions);
     }
-  }, [sessions]);
+  }, [sessions, syncRouteFromUrl]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -88,35 +100,37 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  const handleSelectSession = (session: JulesSession | null) => {
+  const handleSelectSession = useCallback((session: JulesSession | null) => {
     const nextId = session ? session.id : null;
     setSelectedSessionId(nextId);
     updateUrlParams(nextId, selectedRepo);
-  };
+  }, [selectedRepo, updateUrlParams]);
 
-  const handleRepoSelect = (repo: string) => {
+  const handleRepoSelect = useCallback((repo: string) => {
     setSelectedRepo(repo);
     updateUrlParams(selectedSessionId, repo);
-  };
+  }, [selectedSessionId, updateUrlParams]);
 
-  const handleApprovePlan = async (sessionId: string, e: React.MouseEvent) => {
+  const handleApprovePlan = useCallback(async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
       await approvePlanMutation.mutateAsync(sessionId);
     } catch (err) {
       console.error('플랜 승인 실패:', err);
     }
-  };
+  }, [approvePlanMutation]);
 
-  const handleSessionCreated = (newSession: JulesSession) => {
+  const handleSessionCreated = useCallback((newSession: JulesSession) => {
     handleSelectSession(newSession);
-  };
+  }, [handleSelectSession]);
 
-  const handleUpdateSession = (_updated: JulesSession) => {
+  const handleUpdateSession = useCallback((_updated: JulesSession) => {
     // React Query Query Invalidation에 의해 자동으로 최신화됨
-  };
+  }, []);
 
-  const existingRepos = Array.from(new Set(sessions.map((s) => s.repository)));
+  const existingRepos = useMemo(() => {
+    return Array.from(new Set(sessions.map((s) => s.repository)));
+  }, [sessions]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-x-hidden">
@@ -133,6 +147,7 @@ export default function App() {
             onApprovePlan={handleApprovePlan}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenNewTask={() => setIsNewTaskOpen(true)}
+            onOpenShortcuts={() => setIsShortcutsOpen(true)}
             onRefresh={() => refetch()}
             onSessionCreated={handleSessionCreated}
             isLoading={isLoading}
@@ -188,6 +203,7 @@ export default function App() {
               onApprovePlan={handleApprovePlan}
               onOpenSettings={() => setIsSettingsOpen(true)}
               onOpenNewTask={() => setIsNewTaskOpen(true)}
+              onOpenShortcuts={() => setIsShortcutsOpen(true)}
               onRefresh={() => refetch()}
               onSessionCreated={handleSessionCreated}
               isLoading={isLoading}
@@ -196,26 +212,44 @@ export default function App() {
         )}
       </div>
 
-      {/* Onboarding / Settings Modal */}
-      <OnboardingModal
-        isOpen={isSettingsOpen}
-        onClose={() => {
-          setIsSettingsOpen(false);
-          setIsInitialOnboarding(false);
-        }}
-        onSaveSuccess={() => {
-          refetch();
-        }}
-        isInitialOnboarding={isInitialOnboarding}
-      />
+      {/* Lazy Loaded Onboarding / Settings Modal */}
+      <Suspense fallback={null}>
+        {isSettingsOpen && (
+          <OnboardingModal
+            isOpen={isSettingsOpen}
+            onClose={() => {
+              setIsSettingsOpen(false);
+              setIsInitialOnboarding(false);
+            }}
+            onSaveSuccess={() => {
+              refetch();
+            }}
+            isInitialOnboarding={isInitialOnboarding}
+          />
+        )}
+      </Suspense>
 
-      {/* Quick New Task Bottom Sheet */}
-      <NewTaskSheet
-        isOpen={isNewTaskOpen}
-        onClose={() => setIsNewTaskOpen(false)}
-        onSessionCreated={handleSessionCreated}
-        existingRepos={existingRepos}
-      />
+      {/* Lazy Loaded Quick New Task Bottom Sheet */}
+      <Suspense fallback={null}>
+        {isNewTaskOpen && (
+          <NewTaskSheet
+            isOpen={isNewTaskOpen}
+            onClose={() => setIsNewTaskOpen(false)}
+            onSessionCreated={handleSessionCreated}
+            existingRepos={existingRepos}
+          />
+        )}
+      </Suspense>
+
+      {/* Lazy Loaded Keyboard Shortcuts Modal */}
+      <Suspense fallback={null}>
+        {isShortcutsOpen && (
+          <KeyboardShortcutsModal
+            isOpen={isShortcutsOpen}
+            onClose={() => setIsShortcutsOpen(false)}
+          />
+        )}
+      </Suspense>
     </div>
   );
 }
