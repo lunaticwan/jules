@@ -1,19 +1,23 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { parsePatch } from 'diff';
 
 type ParsedDiff = ReturnType<typeof parsePatch>[number];
 import { ChevronRight, ChevronDown, FilePlus, FileMinus, FileCode, Loader2 } from 'lucide-react';
 import { getFileDiffFromDB, saveFileDiffToDB, CachedFileDiff } from '../services/db';
+import { fetchPRFiles } from '../services/githubApi';
 
 export interface FileItem {
   filepath: string;
   status: 'added' | 'modified' | 'deleted';
   additions?: number;
   deletions?: number;
+  patch?: string;
 }
 
 interface ChangedFilesViewProps {
   sessionId: string;
+  repository?: string;
+  prNumber?: number;
   files?: FileItem[];
 }
 
@@ -176,10 +180,48 @@ const ParsedDiffView: React.FC<{ patch: string }> = React.memo(({ patch }) => {
 
 ParsedDiffView.displayName = 'ParsedDiffView';
 
-export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({ sessionId, files = DEFAULT_FILES }) => {
+export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({
+  sessionId,
+  repository,
+  prNumber,
+  files: propsFiles,
+}) => {
+  const [fileList, setFileList] = useState<FileItem[]>(propsFiles || []);
+  const [isFetchingFiles, setIsFetchingFiles] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   const [openFiles, setOpenFiles] = useState<Record<string, boolean>>({});
   const [diffDataMap, setDiffDataMap] = useState<Record<string, CachedFileDiff>>({});
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (propsFiles && propsFiles.length > 0) {
+      setFileList(propsFiles);
+      return;
+    }
+
+    if (repository && prNumber) {
+      setIsFetchingFiles(true);
+      setFetchError(null);
+      fetchPRFiles(repository, prNumber)
+        .then((fetched) => {
+          if (fetched && fetched.length > 0) {
+            setFileList(fetched);
+          } else {
+            setFileList(DEFAULT_FILES);
+          }
+        })
+        .catch((err) => {
+          setFetchError(`GitHub PR 변경 파일 조회 오류: ${err?.message || '실패'}`);
+          setFileList(DEFAULT_FILES);
+        })
+        .finally(() => {
+          setIsFetchingFiles(false);
+        });
+    } else {
+      setFileList(DEFAULT_FILES);
+    }
+  }, [repository, prNumber, propsFiles]);
 
   const toggleFile = useCallback(async (filepath: string) => {
     setOpenFiles((prev) => {
@@ -192,43 +234,56 @@ export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({ sessionId, f
             setDiffDataMap((dPrev) => ({ ...dPrev, [filepath]: cached }));
             setLoadingMap((lPrev) => ({ ...lPrev, [filepath]: false }));
           } else {
-            setTimeout(async () => {
-              const fileInfo = files.find((f) => f.filepath === filepath);
-              const mockDiff: CachedFileDiff = {
-                sessionId,
-                filepath,
-                status: fileInfo?.status || 'modified',
-                additions: fileInfo?.additions || 10,
-                deletions: fileInfo?.deletions || 2,
-                fetchedAt: new Date().toISOString(),
-                patch: generateMockPatch(filepath, fileInfo?.status || 'modified'),
-              };
+            const fileInfo = fileList.find((f) => f.filepath === filepath);
+            const patchText = fileInfo?.patch || generateMockPatch(filepath, fileInfo?.status || 'modified');
 
-              await saveFileDiffToDB(mockDiff);
+            const mockDiff: CachedFileDiff = {
+              sessionId,
+              filepath,
+              status: fileInfo?.status || 'modified',
+              additions: fileInfo?.additions || 10,
+              deletions: fileInfo?.deletions || 2,
+              fetchedAt: new Date().toISOString(),
+              patch: patchText,
+            };
 
+            saveFileDiffToDB(mockDiff).then(() => {
               setDiffDataMap((dPrev) => ({ ...dPrev, [filepath]: mockDiff }));
               setLoadingMap((lPrev) => ({ ...lPrev, [filepath]: false }));
-            }, 300);
+            });
           }
         });
       }
       return { ...prev, [filepath]: isNextOpen };
     });
-  }, [sessionId, files, diffDataMap]);
+  }, [sessionId, fileList, diffDataMap]);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-          변경 파일 목록 ({files.length}개)
+          변경 파일 목록 ({fileList.length}개)
         </h3>
         <span className="text-xs text-slate-500 dark:text-slate-400">
           * 클릭하여 온디맨드로 변경사항 확인
         </span>
       </div>
 
+      {isFetchingFiles && (
+        <div className="flex items-center justify-center py-6 text-xs text-blue-500 gap-2">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>GitHub PR 변경 파일 수신 중...</span>
+        </div>
+      )}
+
+      {fetchError && (
+        <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-xs text-rose-300">
+          {fetchError}
+        </div>
+      )}
+
       <div className="space-y-2">
-        {files.map((file) => (
+        {fileList.map((file) => (
           <FileDiffItem
             key={file.filepath}
             file={file}

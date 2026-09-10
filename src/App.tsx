@@ -4,6 +4,7 @@ import { useJulesSessionsQuery, useApproveJulesPlanMutation } from './hooks/useJ
 import { DashboardView } from './components/DashboardView';
 import { TaskDetailView } from './components/TaskDetailView';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ErrorDialog } from './components/ErrorDialog';
 
 // Code Splitting (Lazy Loading) 적용으로 초기 로딩 번들 크기 감소 및 렌더링 최적화
 const OnboardingModal = lazy(() =>
@@ -17,7 +18,7 @@ const KeyboardShortcutsModal = lazy(() =>
 );
 
 export default function App() {
-  const { data: sessions = [], isLoading, refetch } = useJulesSessionsQuery();
+  const { data: sessions = [], isLoading, error: queryError, refetch } = useJulesSessionsQuery();
   const approvePlanMutation = useApproveJulesPlanMutation();
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -26,6 +27,26 @@ export default function App() {
   const [isNewTaskOpen, setIsNewTaskOpen] = useState<boolean>(false);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
   const [isInitialOnboarding, setIsInitialOnboarding] = useState<boolean>(false);
+
+  // 글로벌 API 에러 다이얼로그 상태
+  const [apiErrorState, setApiErrorState] = useState<{
+    isOpen: boolean;
+    message: string;
+    details?: string;
+  }>({
+    isOpen: false,
+    message: '',
+  });
+
+  useEffect(() => {
+    if (queryError) {
+      setApiErrorState({
+        isOpen: true,
+        message: 'Jules 세션 목록을 불러오는 중 API 오류가 발생했습니다.',
+        details: queryError.message || String(queryError),
+      });
+    }
+  }, [queryError]);
 
   const selectedSession = useMemo(() => {
     return sessions.find((s) => s.id === selectedSessionId || s.name === selectedSessionId) || null;
@@ -115,8 +136,12 @@ export default function App() {
     e.stopPropagation();
     try {
       await approvePlanMutation.mutateAsync(sessionId);
-    } catch (err) {
-      console.error('플랜 승인 실패:', err);
+    } catch (err: any) {
+      setApiErrorState({
+        isOpen: true,
+        message: '플랜 승인 처리 중 에러가 발생했습니다.',
+        details: err?.message || String(err),
+      });
     }
   }, [approvePlanMutation]);
 
@@ -250,6 +275,19 @@ export default function App() {
           />
         )}
       </Suspense>
+
+      {/* Global API Error Dialog */}
+      <ErrorDialog
+        isOpen={apiErrorState.isOpen}
+        message={apiErrorState.message}
+        details={apiErrorState.details}
+        onClose={() => setApiErrorState((prev) => ({ ...prev, isOpen: false }))}
+        onRetry={() => {
+          setApiErrorState((prev) => ({ ...prev, isOpen: false }));
+          refetch();
+        }}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
     </div>
   );
 }
