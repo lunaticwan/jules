@@ -60,7 +60,7 @@ const FileDiffItem = React.memo<{
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-[11px] font-mono shrink-0">
+        <div className="flex items-center gap-2 text-xs font-mono shrink-0">
           {file.additions !== undefined && (
             <span className="text-emerald-600 dark:text-emerald-400">+{file.additions}</span>
           )}
@@ -78,7 +78,7 @@ const FileDiffItem = React.memo<{
               IndexedDB / 지연 로딩 처리 중...
             </div>
           ) : diffData ? (
-            <pre className="text-[11px] font-mono leading-relaxed overflow-x-auto whitespace-pre p-2 rounded bg-slate-900 text-slate-200 dark:bg-slate-900/90 border border-slate-800">
+            <pre className="text-xs font-mono leading-relaxed overflow-x-auto whitespace-pre p-2 rounded bg-slate-900 text-slate-200 dark:bg-slate-900/90 border border-slate-800">
               {diffData.patch.split('\n').map((line, idx) => {
                 let lineStyle = 'text-slate-300';
                 if (line.startsWith('+')) lineStyle = 'text-emerald-400 bg-emerald-950/30';
@@ -146,7 +146,7 @@ export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({ sessionId, f
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
           변경 파일 목록 ({files.length}개)
         </h3>
-        <span className="text-[11px] text-slate-500 dark:text-slate-400">
+        <span className="text-xs text-slate-500 dark:text-slate-400">
           * 클릭하여 온디맨드로 변경사항 확인
         </span>
       </div>

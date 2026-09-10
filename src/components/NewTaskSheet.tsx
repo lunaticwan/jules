@@ -151,7 +151,7 @@ export const NewTaskSheet: React.FC<NewTaskSheetProps> = ({
             <label className="text-xs font-semibold text-slate-300">
               작업 프롬프트 (Prompt)
             </label>
-            <span className="flex items-center gap-1 text-[10px] text-amber-400 font-medium">
+            <span className="flex items-center gap-1 text-xs text-amber-400 font-medium">
               <Sparkles className="h-3 w-3" /> 빠른 프롬프트 템플릿
             </span>
           </div>
@@ -163,7 +163,7 @@ export const NewTaskSheet: React.FC<NewTaskSheetProps> = ({
                 key={preset.label}
                 type="button"
                 onClick={() => handleApplyPreset(preset.template)}
-                className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-1 text-[11px] text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                className="rounded-full bg-slate-800 border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
               >
                 {preset.label}
               </button>
@@ -172,7 +172,7 @@ export const NewTaskSheet: React.FC<NewTaskSheetProps> = ({
 
           {/* LLM 구조화 프롬프트 템플릿 (Agent 개발 친화) */}
           <div className="space-y-1 mb-2">
-            <p className="text-[10px] font-bold text-indigo-400 flex items-center gap-1 uppercase tracking-wider">
+            <p className="text-xs font-bold text-indigo-400 flex items-center gap-1 uppercase tracking-wider">
               <Layers className="h-3 w-3" /> LLM Agent 구조화 프롬프트
             </p>
             <div className="flex flex-wrap gap-1.5">
@@ -181,7 +181,7 @@ export const NewTaskSheet: React.FC<NewTaskSheetProps> = ({
                   key={preset.label}
                   type="button"
                   onClick={() => handleApplyPreset(preset.template)}
-                  className="rounded-lg bg-indigo-950/70 border border-indigo-800/80 px-2.5 py-1 text-[11px] font-semibold text-indigo-300 hover:bg-indigo-900 hover:text-white transition-colors text-left"
+                  className="rounded-lg bg-indigo-950/70 border border-indigo-800/80 px-2.5 py-1 text-xs font-semibold text-indigo-300 hover:bg-indigo-900 hover:text-white transition-colors text-left"
                 >
                   {preset.label}
                 </button>

@@ -56,7 +56,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
 
         <div className="grid grid-cols-2 gap-3 mt-4">
           <div className="rounded-xl bg-white/80 dark:bg-slate-900/80 p-3 border border-slate-200/80 dark:border-slate-800">
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
               <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
               태스크 완료율
             </div>
@@ -66,7 +66,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
           </div>
 
           <div className="rounded-xl bg-white/80 dark:bg-slate-900/80 p-3 border border-slate-200/80 dark:border-slate-800">
-            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
               <Zap className="h-3.5 w-3.5 text-amber-500" />
               평균 작업 시간
             </div>
@@ -83,7 +83,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
           <Zap className="h-4 w-4 text-indigo-500" />
           1-Click AI 스마트 작업 자동 발주
         </h4>
-        <p className="text-[11px] text-slate-600 dark:text-slate-400">
+        <p className="text-xs text-slate-600 dark:text-slate-400">
           GitHub 레포지토리를 직접 분석하여 즉시 실행 가능한 최적화 작업 세션을 1-Click으로 생성합니다.
         </p>
 
@@ -95,7 +95,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
           >
             <div>
               <p className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-500">번들 최적화</p>
-              <p className="text-[10px] text-slate-500">PWA 로딩 속도 향상</p>
+              <p className="text-xs text-slate-500">PWA 로딩 속도 향상</p>
             </div>
             <Play className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
           </button>
@@ -107,7 +107,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
           >
             <div>
               <p className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-indigo-500">보안 스캔</p>
-              <p className="text-[10px] text-slate-500">의존성 패키지 점검</p>
+              <p className="text-xs text-slate-500">의존성 패키지 점검</p>
             </div>
             <Play className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
           </button>
@@ -134,7 +134,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
                   <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
                   <div>
                     <p className="font-mono font-semibold text-slate-800 dark:text-slate-200">{health.repo}</p>
-                    <p className="text-[10px] text-slate-500">상태: 정상 배포됨 (GitHub Pages)</p>
+                    <p className="text-xs text-slate-500">상태: 정상 배포됨 (GitHub Pages)</p>
                   </div>
                 </div>
 
@@ -142,7 +142,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ sessions, onSessio
                   href={health.deploymentUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] hover:bg-emerald-200 dark:hover:bg-emerald-900 transition-colors"
+                  className="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-400 font-semibold text-xs hover:bg-emerald-200 dark:hover:bg-emerald-900 transition-colors"
                 >
                   페이지 열기
                 </a>

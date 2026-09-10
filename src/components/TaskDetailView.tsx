@@ -148,10 +148,10 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
           </button>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/90 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900/70 text-[11px] shrink-0 break-all">
+              <span className="font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/90 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900/70 text-xs shrink-0 break-all">
                 {session.repository}
               </span>
-              <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400 shrink-0">
+              <span className="text-xs font-mono text-slate-500 dark:text-slate-400 shrink-0">
                 ({session.baseBranch || 'main'})
               </span>
               <div className="inline-flex items-center gap-1 text-slate-400">
@@ -300,7 +300,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
                         }`}
                       >
                         {msg.type === 'thought' && (
-                          <div className="mb-1 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider not-italic">
+                          <div className="mb-1 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider not-italic">
                             Thought Process
                           </div>
                         )}

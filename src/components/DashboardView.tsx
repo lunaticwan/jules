@@ -171,16 +171,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="flex items-center gap-1.5">
               <h1 className="text-sm font-bold text-slate-900 dark:text-slate-100 leading-none">JulesPWA</h1>
               {githubToken ? (
-                <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60">
+                <span className="inline-flex items-center rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800/60">
                   GitHub 연동됨
                 </span>
               ) : (
-                <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-[9px] font-medium text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                   로컬/Mock 모드
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400">Workspace Management</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Workspace Management</p>
           </div>
         </div>
 
@@ -258,7 +258,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 ✕
               </button>
             ) : (
-              <kbd className="absolute right-2 top-1 text-[10px] font-mono font-bold text-slate-400 bg-slate-200 dark:bg-slate-700 px-1 rounded pointer-events-none">
+              <kbd className="absolute right-2 top-1 text-xs font-mono font-bold text-slate-400 bg-slate-200 dark:bg-slate-700 px-1 rounded pointer-events-none">
                 /
               </kbd>
             )}
@@ -280,10 +280,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {selectedRepo !== 'ALL' && (
           <div className="flex items-center justify-between text-xs bg-blue-50/60 dark:bg-blue-950/40 px-2 py-1 rounded-md border border-blue-200/80 dark:border-blue-900/50">
-            <span className="font-bold text-blue-700 dark:text-blue-300 font-mono text-[11px] break-all">
+            <span className="font-bold text-blue-700 dark:text-blue-300 font-mono text-xs break-all">
               {selectedRepo}
             </span>
-            <div className="flex items-center gap-1.5 text-[10px] shrink-0 ml-2">
+            <div className="flex items-center gap-1.5 text-xs shrink-0 ml-2">
               <a
                 href={getRepoLinks(selectedRepo).repoUrl}
                 target="_blank"
@@ -310,7 +310,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex items-center gap-1 overflow-x-auto pt-0.5 no-scrollbar">
           <button
             onClick={() => setStatusFilter('ALL')}
-            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors shrink-0 ${
+            className={`px-2 py-0.5 rounded text-xs font-semibold transition-colors shrink-0 ${
               statusFilter === 'ALL'
                 ? 'bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 font-bold'
                 : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:text-slate-200'
@@ -321,7 +321,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => setStatusFilter('IN_PROGRESS')}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors shrink-0 ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition-colors shrink-0 ${
               statusFilter === 'IN_PROGRESS'
                 ? 'bg-blue-600 text-white font-bold'
                 : 'bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/50 dark:border-blue-900/40'
@@ -333,7 +333,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => setStatusFilter('AWAITING_APPROVAL')}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors shrink-0 ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition-colors shrink-0 ${
               statusFilter === 'AWAITING_APPROVAL'
                 ? 'bg-amber-600 text-white font-bold'
                 : 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-900/40'
@@ -345,7 +345,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <button
             onClick={() => setStatusFilter('COMPLETED')}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold transition-colors shrink-0 ${
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold transition-colors shrink-0 ${
               statusFilter === 'COMPLETED'
                 ? 'bg-emerald-600 text-white font-bold'
                 : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/40'
@@ -378,7 +378,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         ) : (
           <table className="w-full text-left border-collapse bg-white dark:bg-slate-900/80 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800">
             <thead>
-              <tr className="bg-slate-100/80 dark:bg-slate-800/80 text-[10px] font-mono text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+              <tr className="bg-slate-100/80 dark:bg-slate-800/80 text-xs font-mono text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                 <th className="py-1.5 px-2 font-bold w-1/4">저장소 (Repo)</th>
                 <th className="py-1.5 px-2 font-bold">태스크 요약</th>
                 <th className="py-1.5 px-1.5 font-bold text-center shrink-0">상태</th>
