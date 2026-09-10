@@ -40,6 +40,7 @@ export default function App() {
 
   useEffect(() => {
     if (queryError) {
+      console.error('[App] [QUERY_ERROR_DETECTED]', queryError);
       setApiErrorState({
         isOpen: true,
         message: 'Jules 세션 목록을 불러오는 중 API 오류가 발생했습니다.',
@@ -122,6 +123,7 @@ export default function App() {
   }, []);
 
   const handleSelectSession = useCallback((session: JulesSession | null) => {
+    console.log('[App] [SELECT_SESSION]', session);
     const nextId = session ? session.id : null;
     setSelectedSessionId(nextId);
     updateUrlParams(nextId, selectedRepo);

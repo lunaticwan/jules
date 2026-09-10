@@ -25,7 +25,12 @@ export const JULES_QUERY_KEYS = {
 export function useJulesSessionsQuery(): UseQueryResult<JulesSession[], Error> {
   return useQuery<JulesSession[]>({
     queryKey: JULES_QUERY_KEYS.sessions,
-    queryFn: fetchJulesSessions,
+    queryFn: async () => {
+      console.log('[useJulesSessionsQuery] [FETCH_START]');
+      const res = await fetchJulesSessions();
+      console.log('[useJulesSessionsQuery] [FETCH_SUCCESS]', res);
+      return res;
+    },
     staleTime: 1000 * 30,
   });
 }
@@ -38,7 +43,13 @@ export function useJulesSessionDetailQuery(
 ): UseQueryResult<JulesSession | null, Error> {
   return useQuery<JulesSession | null>({
     queryKey: JULES_QUERY_KEYS.sessionDetail(sessionId || ''),
-    queryFn: () => (sessionId ? fetchJulesSessionDetail(sessionId) : Promise.resolve(null)),
+    queryFn: async () => {
+      console.log('[useJulesSessionDetailQuery] [FETCH_START] sessionId:', sessionId);
+      if (!sessionId) return null;
+      const res = await fetchJulesSessionDetail(sessionId);
+      console.log('[useJulesSessionDetailQuery] [FETCH_SUCCESS]', res);
+      return res;
+    },
     enabled: !!sessionId,
   });
 }
