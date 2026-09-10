@@ -145,7 +145,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               value={julesKey}
               onChange={(e) => setJulesKeyInput(e.target.value)}
             />
-            <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
+            <p className="mt-1 flex items-center gap-1 text-xs text-slate-400">
               <Info className="h-3 w-3 text-blue-400 shrink-0" />
               API 키 미입력 시 제한 없이 로컬 체험 모드로 작동합니다.
             </p>
@@ -164,7 +164,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
               value={githubToken}
               onChange={(e) => setGithubTokenInput(e.target.value)}
             />
-            <div className="mt-2 rounded-lg bg-slate-800/80 p-2.5 text-[11px] text-slate-300 border border-slate-700 space-y-1">
+            <div className="mt-2 rounded-lg bg-slate-800/80 p-2.5 text-xs text-slate-300 border border-slate-700 space-y-1">
               <p className="flex items-center gap-1 font-semibold text-blue-400">
                 <Info className="h-3.5 w-3.5 shrink-0" />
                 토큰 갱신 및 보안 안내
