@@ -23,6 +23,13 @@ export interface OfflineAction {
 
 let dbInstance: IDBDatabase | null = null;
 
+// IndexedDB 사용 불가 시 In-Memory Fallback Map
+const inMemoryCache = {
+  sessions: new Map<string, any>(),
+  fileDiffs: new Map<string, CachedFileDiff>(),
+  offlineQueue: [] as OfflineAction[],
+};
+
 /**
  * IndexedDB 초기화 및 데이터베이스 연결
  */
@@ -33,37 +40,47 @@ export function openDB(): Promise<IDBDatabase> {
       return;
     }
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB 지원되지 않음'));
+      return;
+    }
 
-    request.onerror = () => {
-      console.warn('IndexedDB 열기 실패 (폴백 처리):', request.error);
-      reject(request.error || new Error('IndexedDB 열기 실패'));
-    };
+    try {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onsuccess = () => {
-      dbInstance = request.result;
-      resolve(dbInstance);
-    };
+      request.onerror = () => {
+        console.warn('IndexedDB 열기 실패 (인메모리 폴백 전환):', request.error);
+        reject(request.error || new Error('IndexedDB 열기 실패'));
+      };
 
-    request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
-      const db = (event.target as IDBOpenDBRequest).result;
+      request.onsuccess = () => {
+        dbInstance = request.result;
+        resolve(dbInstance);
+      };
 
-      // 1. 세션 캐시 스토어
-      if (!db.objectStoreNames.contains('sessions')) {
-        db.createObjectStore('sessions', { keyPath: 'id' });
-      }
+      request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
+        const db = (event.target as IDBOpenDBRequest).result;
 
-      // 2. 변경 파일 Diff 캐시 스토어 (sessionId + filepath 복합 키)
-      if (!db.objectStoreNames.contains('file_diffs')) {
-        const fileDiffStore = db.createObjectStore('file_diffs', { keyPath: ['sessionId', 'filepath'] });
-        fileDiffStore.createIndex('sessionId', 'sessionId', { unique: false });
-      }
+        // 1. 세션 캐시 스토어
+        if (!db.objectStoreNames.contains('sessions')) {
+          db.createObjectStore('sessions', { keyPath: 'id' });
+        }
 
-      // 3. 오프라인 작업 큐 스토어
-      if (!db.objectStoreNames.contains('offline_queue')) {
-        db.createObjectStore('offline_queue', { keyPath: 'id', autoIncrement: true });
-      }
-    };
+        // 2. 변경 파일 Diff 캐시 스토어 (sessionId + filepath 복합 키)
+        if (!db.objectStoreNames.contains('file_diffs')) {
+          const fileDiffStore = db.createObjectStore('file_diffs', { keyPath: ['sessionId', 'filepath'] });
+          fileDiffStore.createIndex('sessionId', 'sessionId', { unique: false });
+        }
+
+        // 3. 오프라인 작업 큐 스토어
+        if (!db.objectStoreNames.contains('offline_queue')) {
+          db.createObjectStore('offline_queue', { keyPath: 'id', autoIncrement: true });
+        }
+      };
+    } catch (err) {
+      console.warn('IndexedDB 접근 시 예외 발생:', err);
+      reject(err);
+    }
   });
 }
 
@@ -77,9 +94,13 @@ export async function saveSessionsToDB(sessions: any[]): Promise<void> {
     const store = tx.objectStore('sessions');
     for (const session of sessions) {
       store.put(session);
+      inMemoryCache.sessions.set(session.id, session);
     }
   } catch (err) {
-    console.warn('IndexedDB 세션 저장 실패:', err);
+    console.warn('IndexedDB 세션 저장 실패, 인메모리 저장소 대체:', err);
+    for (const session of sessions) {
+      inMemoryCache.sessions.set(session.id, session);
+    }
   }
 }
 
@@ -92,15 +113,15 @@ export async function getSessionsFromDB(): Promise<any[]> {
         const store = tx.objectStore('sessions');
         const request = store.getAll();
         request.onsuccess = () => resolve(request.result || []);
-        request.onerror = () => resolve([]);
+        request.onerror = () => resolve(Array.from(inMemoryCache.sessions.values()));
       } catch (err) {
         console.warn('IndexedDB 세션 트랜잭션 실패:', err);
-        resolve([]);
+        resolve(Array.from(inMemoryCache.sessions.values()));
       }
     });
   } catch (err) {
-    console.warn('IndexedDB 세션 불러오기 실패:', err);
-    return [];
+    console.warn('IndexedDB 세션 불러오기 실패, 인메모리 반환:', err);
+    return Array.from(inMemoryCache.sessions.values());
   }
 }
 

@@ -29,25 +29,48 @@ export const NewTaskSheet: React.FC<NewTaskSheetProps> = ({
   const [repository, setRepository] = useState(existingRepos[0] || 'acme/mobile-pwa');
   const [baseBranch, setBaseBranch] = useState('main');
   const [prompt, setPrompt] = useState('');
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const createSessionMutation = useCreateJulesSessionMutation();
   const isSubmitting = createSessionMutation.isPending;
 
+  const repoRegex = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!repository.trim() || !prompt.trim() || isSubmitting) return;
+    setValidationError(null);
+
+    const trimmedRepo = repository.trim();
+    const trimmedPrompt = prompt.trim();
+
+    if (!trimmedRepo) {
+      setValidationError('레포지토리 이름을 입력하십시오.');
+      return;
+    }
+
+    if (!repoRegex.test(trimmedRepo)) {
+      setValidationError('올바른 저장소 형식이 아닙니다 (예: owner/repository)');
+      return;
+    }
+
+    if (!trimmedPrompt) {
+      setValidationError('작업 프롬프트 내용을 입력하십시오.');
+      return;
+    }
+
+    if (isSubmitting) return;
 
     try {
       const newSession = await createSessionMutation.mutateAsync({
-        repository: repository.trim(),
+        repository: trimmedRepo,
         baseBranch: baseBranch.trim() || 'main',
-        prompt: prompt.trim(),
+        prompt: trimmedPrompt,
       });
       onSessionCreated(newSession);
       setPrompt('');
       onClose();
-    } catch (err) {
-      console.error('태스크 생성 실패:', err);
+    } catch (err: any) {
+      setValidationError(`태스크 생성 실패: ${err?.message || '알 수 없는 오류 발생'}`);
     }
   };
 
@@ -58,6 +81,14 @@ export const NewTaskSheet: React.FC<NewTaskSheetProps> = ({
   return (
     <Sheet isOpen={isOpen} onClose={onClose} title="새 Jules 태스크 요청">
       <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+        {validationError && (
+          <div className="rounded-lg bg-rose-950/80 p-2.5 text-xs text-rose-300 border border-rose-800/80 flex items-center justify-between">
+            <span>{validationError}</span>
+            <button type="button" onClick={() => setValidationError(null)} className="text-xs font-bold hover:underline">
+              ✕
+            </button>
+          </div>
+        )}
         <div>
           <label className="mb-1 block text-xs font-semibold text-slate-300">
             저장소 (Repository)
