@@ -242,8 +242,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Session List Grid */}
-      <div className="p-2 space-y-1.5">
+      {/* Dense Spreadsheet Table View */}
+      <div className="p-1 overflow-x-auto">
         {filteredSessions.length === 0 ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-8 text-center text-slate-500 dark:text-slate-400">
             <p className="text-xs font-medium">검색 조건에 맞는 작업 세션이 없습니다.</p>
@@ -261,15 +261,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </div>
         ) : (
-          filteredSessions.map((session) => (
-            <SessionCard
-              key={session.id}
-              session={session}
-              isSelected={session.id === selectedSessionId}
-              onSelect={onSelectSession}
-              onApprovePlan={onApprovePlan}
-            />
-          ))
+          <table className="w-full text-left border-collapse bg-white dark:bg-slate-900/80 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800">
+            <thead>
+              <tr className="bg-slate-100/80 dark:bg-slate-800/80 text-[10px] font-mono text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                <th className="py-1 px-1.5 font-bold">저장소 (Repo)</th>
+                <th className="py-1 px-1 font-bold">브랜치</th>
+                <th className="py-1 px-1.5 font-bold">태스크 요약</th>
+                <th className="py-1 px-1 font-bold text-center">상태</th>
+                <th className="py-1 px-1 font-bold text-center">PR</th>
+                <th className="py-1 px-1 font-bold text-right">업데이트</th>
+                <th className="py-1 px-1 font-bold text-center">액션</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredSessions.map((session) => (
+                <SessionCard
+                  key={session.id}
+                  session={session}
+                  isSelected={session.id === selectedSessionId}
+                  onSelect={onSelectSession}
+                  onApprovePlan={onApprovePlan}
+                />
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
 

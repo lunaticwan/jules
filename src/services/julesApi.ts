@@ -150,15 +150,28 @@ const INITIAL_MOCK_SESSIONS: JulesSession[] = [
 ];
 
 export function getJulesApiKey(): string {
-  return localStorage.getItem(STORAGE_KEYS.JULES_KEY) || '';
+  try {
+    return localStorage.getItem(STORAGE_KEYS.JULES_KEY) || '';
+  } catch (err) {
+    console.warn('LocalStorage 접근 실패 (Jules API Key):', err);
+    return '';
+  }
 }
 
 export function setJulesApiKey(key: string): void {
-  localStorage.setItem(STORAGE_KEYS.JULES_KEY, key.trim());
+  try {
+    localStorage.setItem(STORAGE_KEYS.JULES_KEY, key.trim());
+  } catch (err) {
+    console.warn('LocalStorage 저장 실패 (Jules API Key):', err);
+  }
 }
 
 export function clearJulesApiKey(): void {
-  localStorage.removeItem(STORAGE_KEYS.JULES_KEY);
+  try {
+    localStorage.removeItem(STORAGE_KEYS.JULES_KEY);
+  } catch (err) {
+    console.warn('LocalStorage 삭제 실패 (Jules API Key):', err);
+  }
 }
 
 /**
@@ -187,21 +200,40 @@ export async function verifyJulesKey(keyInput?: string): Promise<{ success: bool
   }
 }
 
+let inMemorySessionsCache: JulesSession[] | null = null;
+
 export function getStoredSessions(): JulesSession[] {
-  const data = localStorage.getItem(STORAGE_KEYS.MOCK_SESSIONS);
-  if (!data) {
-    localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(INITIAL_MOCK_SESSIONS));
-    return INITIAL_MOCK_SESSIONS;
-  }
   try {
-    return JSON.parse(data);
-  } catch {
-    return INITIAL_MOCK_SESSIONS;
+    const data = localStorage.getItem(STORAGE_KEYS.MOCK_SESSIONS);
+    if (!data) {
+      if (!inMemorySessionsCache) inMemorySessionsCache = INITIAL_MOCK_SESSIONS;
+      try {
+        localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(INITIAL_MOCK_SESSIONS));
+      } catch {}
+      return inMemorySessionsCache;
+    }
+    const parsed = JSON.parse(data);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      inMemorySessionsCache = parsed;
+      return parsed;
+    }
+  } catch (err) {
+    console.warn('LocalStorage 세션 파싱 실패, 인메모리 반환:', err);
   }
+
+  if (!inMemorySessionsCache) {
+    inMemorySessionsCache = INITIAL_MOCK_SESSIONS;
+  }
+  return inMemorySessionsCache;
 }
 
 export function saveStoredSessions(sessions: JulesSession[]): void {
-  localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(sessions));
+  inMemorySessionsCache = sessions;
+  try {
+    localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(sessions));
+  } catch (err) {
+    console.warn('LocalStorage 저장 실패 (In-Memory 캐시 사용):', err);
+  }
 }
 
 /**

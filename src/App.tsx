@@ -19,21 +19,26 @@ export default function App() {
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId || s.name === selectedSessionId) || null;
 
-  // URL Query 파라미터 기반 라우트 상태 읽기 및 동기화
+  // URL Query 파라미터 기반 라우트 상태 읽기 및 동기화 (safe decode)
   const syncRouteFromUrl = (sessionList: JulesSession[]) => {
-    const params = new URLSearchParams(window.location.search);
-    const sessionParam = params.get('session');
-    const repoParam = params.get('repo');
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const sessionParam = params.get('session');
+      const repoParam = params.get('repo');
 
-    if (repoParam) {
-      setSelectedRepo(repoParam);
-    }
-
-    if (sessionParam) {
-      const found = sessionList.find((s) => s.id === sessionParam || s.name === sessionParam);
-      if (found) {
-        setSelectedSessionId(found.id);
+      if (repoParam) {
+        setSelectedRepo(decodeURIComponent(repoParam));
       }
+
+      if (sessionParam) {
+        const decodedSession = decodeURIComponent(sessionParam);
+        const found = sessionList.find((s) => s.id === decodedSession || s.name === decodedSession);
+        if (found) {
+          setSelectedSessionId(found.id);
+        }
+      }
+    } catch (err) {
+      console.warn('URL 파라미터 디코딩 예외 방어:', err);
     }
   };
 

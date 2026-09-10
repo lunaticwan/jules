@@ -35,15 +35,28 @@ export function getRepoLinks(repository: string): RepoLinks {
 const GITHUB_TOKEN_KEY = 'github_pat';
 
 export function getGitHubToken(): string {
-  return localStorage.getItem(GITHUB_TOKEN_KEY) || '';
+  try {
+    return localStorage.getItem(GITHUB_TOKEN_KEY) || '';
+  } catch (err) {
+    console.warn('LocalStorage 접근 실패 (GitHub PAT):', err);
+    return '';
+  }
 }
 
 export function setGitHubToken(token: string): void {
-  localStorage.setItem(GITHUB_TOKEN_KEY, token.trim());
+  try {
+    localStorage.setItem(GITHUB_TOKEN_KEY, token.trim());
+  } catch (err) {
+    console.warn('LocalStorage 저장 실패 (GitHub PAT):', err);
+  }
 }
 
 export function clearGitHubToken(): void {
-  localStorage.removeItem(GITHUB_TOKEN_KEY);
+  try {
+    localStorage.removeItem(GITHUB_TOKEN_KEY);
+  } catch (err) {
+    console.warn('LocalStorage 삭제 실패 (GitHub PAT):', err);
+  }
 }
 
 /**
