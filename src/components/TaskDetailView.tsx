@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowLeft, ExternalLink, Send, CheckCircle2, Bot, User, Check, GitPullRequest, FileText, MessageSquare, GitBranch, Globe, Copy, Sparkles } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Send, CheckCircle2, Bot, User, Check, GitPullRequest, FileText, MessageSquare, GitBranch, Globe, Copy } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { ScrollArea } from './ui/ScrollArea';
@@ -7,7 +7,7 @@ import { Toast } from './ui/Toast';
 import { ChangedFilesView } from './ChangedFilesView';
 import { JulesSession } from '../services/julesApi';
 import { getRepoLinks } from '../services/githubApi';
-import { useApproveJulesPlanMutation, useSendJulesMessageMutation } from '../hooks/useJulesQueries';
+import { useApproveJulesPlanMutation, useSendJulesMessageMutation, useJulesSessionDetailQuery } from '../hooks/useJulesQueries';
 
 export interface TaskDetailViewProps {
   session: JulesSession;
@@ -17,7 +17,7 @@ export interface TaskDetailViewProps {
 }
 
 export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
-  session,
+  session: initialSession,
   onBack,
   onUpdateSession,
 }) => {
@@ -25,6 +25,9 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   const [inputMsg, setInputMsg] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const { data: detailSession, isLoading: isDetailLoading } = useJulesSessionDetailQuery(initialSession?.id);
+  const session = detailSession || initialSession;
 
   const approvePlanMutation = useApproveJulesPlanMutation();
   const sendMessageMutation = useSendJulesMessageMutation();
@@ -88,44 +91,43 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   };
 
   /**
-   * LLM 개발 친화적 콘텍스트 Markdown 익스포터
+   * 세션 전체 대화 내용 복사하기
    */
-  const handleExportLLMContext = () => {
-    const formattedMarkdown = `
-# [LLM Context Export] ${session.title || session.prompt}
+  const handleCopyFullConversation = () => {
+    const lines: string[] = [];
+    lines.push(`[작업 세션] ${session.title || session.prompt}`);
+    lines.push(`저장소: ${session.repository}`);
+    lines.push(`상태: ${session.state}`);
+    lines.push('---');
+    if (planSteps.length > 0) {
+      lines.push('[실행 플랜]');
+      planSteps.forEach((step) => {
+        lines.push(`- [${step.status === 'completed' ? 'v' : ' '}] ${step.title}`);
+      });
+      lines.push('---');
+    }
+    lines.push('[대화 내역]');
+    messages.forEach((m) => {
+      const sender = m.sender === 'user' ? '사용자' : 'Jules';
+      lines.push(`[${sender}] ${m.content}`);
+    });
 
-## 1. 세션 메타데이터
-- **Session ID**: \`${session.id}\`
-- **Repository**: \`${session.repository}\`
-- **Base Branch**: \`${session.baseBranch || 'main'}\`
-- **Current State**: \`${session.state}\`
-${session.prUrl ? `- **Pull Request**: [PR #${session.prNumber}](${session.prUrl})` : ''}
-
-## 2. 작업 목표 및 프롬프트
-\`\`\`
-${session.prompt}
-\`\`\`
-
-## 3. 실행 플랜 (Plan Steps)
-${planSteps.length > 0
-  ? planSteps.map((step) => `- [${step.status === 'completed' ? 'x' : ' '}] ${step.title}`).join('\n')
-  : '등록된 플랜 단계 없음'}
-
-## 4. 메시지 및 프롬프트 타임라인
-${messages.length > 0
-  ? messages.map((m) => `### [${m.sender.toUpperCase()}] (${m.type || 'message'})\n${m.content}`).join('\n\n')
-  : '메시지 내역 없음'}
-`.trim();
-
-    navigator.clipboard.writeText(formattedMarkdown).then(() => {
-      setToastMessage('LLM 포맷 콘텍스트가 클립보드에 복사되었습니다.');
+    const fullText = lines.join('\n');
+    navigator.clipboard.writeText(fullText).then(() => {
+      setToastMessage('세션 전체 대화 내용이 복사되었습니다.');
     }).catch(() => {
       setActionError('클립보드 복사에 실패했습니다.');
     });
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
+    <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors relative">
+      {(isDetailLoading || isSubmitting) && (
+        <div className="w-full bg-blue-100 dark:bg-blue-950 h-1 overflow-hidden sticky top-0 z-30">
+          <div className="bg-blue-600 h-full animate-pulse w-full" />
+        </div>
+      )}
+
       <Toast
         isOpen={!!toastMessage}
         message={toastMessage || ''}
@@ -223,15 +225,14 @@ ${messages.length > 0
           </button>
         </div>
 
-        {/* LLM Context Exporter Button */}
+        {/* COPY (전체 세션 대화 내용 복사하기) 버튼 */}
         <button
-          onClick={handleExportLLMContext}
-          className="flex items-center gap-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/80 border border-indigo-200 dark:border-indigo-800 px-2 py-1 text-[11px] font-bold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors"
-          title="LLM에 직접 제공할 프롬프트 콘텍스트 복사"
+          onClick={handleCopyFullConversation}
+          className="flex items-center gap-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1 text-xs font-bold shadow-sm transition-colors shrink-0"
+          title="세션 대화내용 전체 복사하기"
         >
-          <Sparkles className="h-3 w-3 text-amber-500" />
-          <span>LLM 콘텍스트 복사</span>
-          <Copy className="h-3 w-3 ml-0.5" />
+          <Copy className="h-3.5 w-3.5" />
+          <span>COPY</span>
         </button>
       </div>
 

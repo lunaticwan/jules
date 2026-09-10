@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, CheckCircle2, Clock, AlertCircle, ArrowRight } from 'lucide-react';
+import { ExternalLink, CheckCircle2, Clock, AlertCircle, ArrowRight, GitPullRequest } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { JulesSession } from '../services/julesApi';
@@ -79,38 +79,38 @@ export const SessionCard: React.FC<SessionCardProps> = React.memo(({
         isSelected ? 'bg-blue-100/80 dark:bg-blue-950/70 font-semibold' : ''
       }`}
     >
-      <td className="py-1.5 px-1.5 font-bold text-blue-700 dark:text-blue-300 break-all leading-tight">
+      <td className="py-2 px-2 font-bold text-blue-700 dark:text-blue-300 break-all leading-tight align-top">
         {session.repository}
       </td>
-      <td className="py-1.5 px-1 text-slate-500 dark:text-slate-400 shrink-0 text-[10px]">
-        {session.baseBranch || 'main'}
-      </td>
-      <td className="py-1.5 px-1.5 text-slate-900 dark:text-slate-100 font-sans font-medium line-clamp-1 leading-snug">
+      <td className="py-2 px-2 text-slate-900 dark:text-slate-100 font-sans font-medium leading-relaxed whitespace-normal break-words align-top">
         {session.title || session.prompt}
       </td>
-      <td className="py-1.5 px-1 text-center whitespace-nowrap">
+      <td className="py-2 px-1.5 text-center whitespace-nowrap align-top">
         {getStatusBadge()}
       </td>
-      <td className="py-1.5 px-1 text-center whitespace-nowrap">
+      <td className="py-2 px-1.5 text-center whitespace-nowrap align-top">
         {session.prNumber ? (
           <a
             href={session.prUrl}
             target="_blank"
             rel="noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center gap-0.5 text-purple-600 dark:text-purple-400 font-semibold hover:underline"
+            className="inline-flex items-center gap-1 bg-purple-100 dark:bg-purple-950/80 text-purple-700 dark:text-purple-300 border border-purple-300 dark:border-purple-800 px-1.5 py-0.5 rounded text-[10px] font-bold hover:underline"
           >
-            #{session.prNumber}
+            <GitPullRequest className="h-3 w-3" />
+            PR #{session.prNumber}
             <ExternalLink className="h-2.5 w-2.5" />
           </a>
         ) : (
-          <span className="text-slate-400 dark:text-slate-600">-</span>
+          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium text-slate-400 bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
+            미생성
+          </span>
         )}
       </td>
-      <td className="py-1.5 px-1 text-right text-slate-500 dark:text-slate-400 whitespace-nowrap text-[10px]">
+      <td className="py-2 px-1.5 text-right text-slate-500 dark:text-slate-400 whitespace-nowrap text-[10px] align-top">
         {getRelativeTime(session.updatedAt)}
       </td>
-      <td className="py-1.5 px-1 text-center whitespace-nowrap">
+      <td className="py-2 px-1.5 text-center whitespace-nowrap align-top">
         {isAwaitingApproval ? (
           <Button
             size="sm"

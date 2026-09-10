@@ -154,6 +154,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-20 transition-colors">
+      {/* Loading Progress Bar */}
+      {isLoading && (
+        <div className="w-full bg-blue-100 dark:bg-blue-950 h-1 overflow-hidden sticky top-0 z-30">
+          <div className="bg-blue-600 h-full animate-pulse w-full" />
+        </div>
+      )}
+
       {/* Header */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 px-3.5 py-2.5 backdrop-blur-md safe-pt">
         <div className="flex items-center gap-2">
@@ -350,8 +357,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      <div className="p-1 overflow-x-auto">
-        {sortedAndFilteredSessions.length === 0 ? (
+      <div className="p-1 overflow-x-auto relative">
+        {isLoading && sessions.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
+            <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
+            <span className="text-xs font-semibold">작업 세션 목록을 불러오는 중...</span>
+          </div>
+        ) : sortedAndFilteredSessions.length === 0 ? (
           <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 p-8 text-center text-slate-500 dark:text-slate-400">
             <p className="text-xs font-medium">검색 조건에 맞는 작업 세션이 없습니다.</p>
             {(searchQuery || statusFilter !== 'ALL' || selectedRepo !== 'ALL') && (
@@ -367,13 +379,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <table className="w-full text-left border-collapse bg-white dark:bg-slate-900/80 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800">
             <thead>
               <tr className="bg-slate-100/80 dark:bg-slate-800/80 text-[10px] font-mono text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                <th className="py-1 px-1.5 font-bold">저장소 (Repo)</th>
-                <th className="py-1 px-1 font-bold">브랜치</th>
-                <th className="py-1 px-1.5 font-bold">태스크 요약</th>
-                <th className="py-1 px-1 font-bold text-center">상태</th>
-                <th className="py-1 px-1 font-bold text-center">PR</th>
-                <th className="py-1 px-1 font-bold text-right">업데이트</th>
-                <th className="py-1 px-1 font-bold text-center">액션</th>
+                <th className="py-1.5 px-2 font-bold w-1/4">저장소 (Repo)</th>
+                <th className="py-1.5 px-2 font-bold">태스크 요약</th>
+                <th className="py-1.5 px-1.5 font-bold text-center shrink-0">상태</th>
+                <th className="py-1.5 px-1.5 font-bold text-center shrink-0">PR 생성 여부</th>
+                <th className="py-1.5 px-1.5 font-bold text-right shrink-0">업데이트</th>
+                <th className="py-1.5 px-1.5 font-bold text-center shrink-0">액션</th>
               </tr>
             </thead>
             <tbody>

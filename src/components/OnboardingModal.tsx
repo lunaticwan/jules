@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Key, GitBranch, Save, Trash2, X, Info, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import { Key, GitBranch, Save, Trash2, X, Info, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { getJulesApiKey, setJulesApiKey, clearJulesApiKey, verifyJulesKey } from '../services/julesApi';
@@ -20,8 +20,6 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
 }) => {
   const [julesKey, setJulesKeyInput] = useState('');
   const [githubToken, setGithubTokenInput] = useState('');
-  const [showJulesKey, setShowJulesKey] = useState(false);
-  const [showGithubToken, setShowGithubToken] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [verifyMsg, setVerifyMsg] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -140,17 +138,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 <Key className="h-3.5 w-3.5 text-amber-400" />
                 Google Jules API Key
               </span>
-              <button
-                type="button"
-                onClick={() => setShowJulesKey(!showJulesKey)}
-                className="text-slate-400 hover:text-slate-200 flex items-center gap-1 text-[11px]"
-              >
-                {showJulesKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                {showJulesKey ? '숨기기' : '보기'}
-              </button>
             </label>
             <Input
-              type={showJulesKey ? 'text' : 'password'}
+              type="text"
               placeholder="API 키 입력 (미입력 시 Mock 데이터 활성화)"
               value={julesKey}
               onChange={(e) => setJulesKeyInput(e.target.value)}
@@ -167,17 +157,9 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
                 <GitBranch className="h-3.5 w-3.5 text-slate-200" />
                 GitHub Personal Access Token <span className="text-slate-500">(선택)</span>
               </span>
-              <button
-                type="button"
-                onClick={() => setShowGithubToken(!showGithubToken)}
-                className="text-slate-400 hover:text-slate-200 flex items-center gap-1 text-[11px]"
-              >
-                {showGithubToken ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-                {showGithubToken ? '숨기기' : '보기'}
-              </button>
             </label>
             <Input
-              type={showGithubToken ? 'text' : 'password'}
+              type="text"
               placeholder="ghp_..."
               value={githubToken}
               onChange={(e) => setGithubTokenInput(e.target.value)}
