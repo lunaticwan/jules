@@ -220,7 +220,7 @@ export function clearJulesApiKey(): void {
 export async function verifyJulesKey(keyInput?: string): Promise<{ success: boolean; message: string }> {
   const apiKey = keyInput !== undefined ? keyInput.trim() : getJulesApiKey();
   if (!apiKey) {
-    return { success: false, message: 'Jules API 키가 입력되지 않았음 (Mock 모드 동작)' };
+    return { success: false, message: 'Jules API 키가 입력되지 않았음 (로컬/Mock 모드로 정상 동작)' };
   }
 
   try {
@@ -234,9 +234,9 @@ export async function verifyJulesKey(keyInput?: string): Promise<{ success: bool
   } catch (err: any) {
     const status = err?.response?.status;
     if (status === 401 || status === 403) {
-      return { success: false, message: '유효하지 않거나 권한이 없는 Jules API 키임' };
+      return { success: false, message: '유효하지 않거나 권한이 없는 Jules API 키임 (로컬 폴백 적용)' };
     }
-    return { success: false, message: `Jules API 검증 실패: ${err?.message || '네트워크 오류'}` };
+    return { success: false, message: `Jules API 검증 실패: ${err?.message || 'CORS/네트워크 오류 (로컬 폴백 활성화)'}` };
   }
 }
 
