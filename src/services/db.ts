@@ -23,6 +23,13 @@ export interface OfflineAction {
 
 let dbInstance: IDBDatabase | null = null;
 
+// IndexedDB 사용 불가 시 In-Memory Fallback Map
+const inMemoryCache = {
+  sessions: new Map<string, any>(),
+  fileDiffs: new Map<string, CachedFileDiff>(),
+  offlineQueue: [] as OfflineAction[],
+};
+
 /**
  * IndexedDB 초기화 및 데이터베이스 연결
  */
@@ -33,37 +40,47 @@ export function openDB(): Promise<IDBDatabase> {
       return;
     }
 
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB 지원되지 않음'));
+      return;
+    }
 
-    request.onerror = () => {
-      console.error('IndexedDB 열기 실패:', request.error);
-      reject(request.error);
-    };
+    try {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onsuccess = () => {
-      dbInstance = request.result;
-      resolve(dbInstance);
-    };
+      request.onerror = () => {
+        console.warn('IndexedDB 열기 실패 (인메모리 폴백 전환):', request.error);
+        reject(request.error || new Error('IndexedDB 열기 실패'));
+      };
 
-    request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
-      const db = (event.target as IDBOpenDBRequest).result;
+      request.onsuccess = () => {
+        dbInstance = request.result;
+        resolve(dbInstance);
+      };
 
-      // 1. 세션 캐시 스토어
-      if (!db.objectStoreNames.contains('sessions')) {
-        db.createObjectStore('sessions', { keyPath: 'id' });
-      }
+      request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
+        const db = (event.target as IDBOpenDBRequest).result;
 
-      // 2. 변경 파일 Diff 캐시 스토어 (sessionId + filepath 복합 키)
-      if (!db.objectStoreNames.contains('file_diffs')) {
-        const fileDiffStore = db.createObjectStore('file_diffs', { keyPath: ['sessionId', 'filepath'] });
-        fileDiffStore.createIndex('sessionId', 'sessionId', { unique: false });
-      }
+        // 1. 세션 캐시 스토어
+        if (!db.objectStoreNames.contains('sessions')) {
+          db.createObjectStore('sessions', { keyPath: 'id' });
+        }
 
-      // 3. 오프라인 작업 큐 스토어
-      if (!db.objectStoreNames.contains('offline_queue')) {
-        db.createObjectStore('offline_queue', { keyPath: 'id', autoIncrement: true });
-      }
-    };
+        // 2. 변경 파일 Diff 캐시 스토어 (sessionId + filepath 복합 키)
+        if (!db.objectStoreNames.contains('file_diffs')) {
+          const fileDiffStore = db.createObjectStore('file_diffs', { keyPath: ['sessionId', 'filepath'] });
+          fileDiffStore.createIndex('sessionId', 'sessionId', { unique: false });
+        }
+
+        // 3. 오프라인 작업 큐 스토어
+        if (!db.objectStoreNames.contains('offline_queue')) {
+          db.createObjectStore('offline_queue', { keyPath: 'id', autoIncrement: true });
+        }
+      };
+    } catch (err) {
+      console.warn('IndexedDB 접근 시 예외 발생:', err);
+      reject(err);
+    }
   });
 }
 
@@ -77,9 +94,13 @@ export async function saveSessionsToDB(sessions: any[]): Promise<void> {
     const store = tx.objectStore('sessions');
     for (const session of sessions) {
       store.put(session);
+      inMemoryCache.sessions.set(session.id, session);
     }
   } catch (err) {
-    console.warn('IndexedDB 세션 저장 실패:', err);
+    console.warn('IndexedDB 세션 저장 실패, 인메모리 저장소 대체:', err);
+    for (const session of sessions) {
+      inMemoryCache.sessions.set(session.id, session);
+    }
   }
 }
 
@@ -87,15 +108,20 @@ export async function getSessionsFromDB(): Promise<any[]> {
   try {
     const db = await openDB();
     return new Promise((resolve) => {
-      const tx = db.transaction('sessions', 'readonly');
-      const store = tx.objectStore('sessions');
-      const request = store.getAll();
-      request.onsuccess = () => resolve(request.result || []);
-      request.onerror = () => resolve([]);
+      try {
+        const tx = db.transaction('sessions', 'readonly');
+        const store = tx.objectStore('sessions');
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => resolve(Array.from(inMemoryCache.sessions.values()));
+      } catch (err) {
+        console.warn('IndexedDB 세션 트랜잭션 실패:', err);
+        resolve(Array.from(inMemoryCache.sessions.values()));
+      }
     });
   } catch (err) {
-    console.warn('IndexedDB 세션 불러오기 실패:', err);
-    return [];
+    console.warn('IndexedDB 세션 불러오기 실패, 인메모리 반환:', err);
+    return Array.from(inMemoryCache.sessions.values());
   }
 }
 
@@ -103,6 +129,8 @@ export async function getSessionsFromDB(): Promise<any[]> {
  * 특정 세션의 파일 Diff 캐시 저장
  */
 export async function saveFileDiffToDB(diff: CachedFileDiff): Promise<void> {
+  const key = `${diff.sessionId}:${diff.filepath}`;
+  inMemoryCache.fileDiffs.set(key, diff);
   try {
     const db = await openDB();
     const tx = db.transaction('file_diffs', 'readwrite');
@@ -117,14 +145,23 @@ export async function saveFileDiffToDB(diff: CachedFileDiff): Promise<void> {
  * 특정 세션 및 파일의 캐시된 Diff 가져오기
  */
 export async function getFileDiffFromDB(sessionId: string, filepath: string): Promise<CachedFileDiff | null> {
+  const key = `${sessionId}:${filepath}`;
+  const memoryFound = inMemoryCache.fileDiffs.get(key);
+  if (memoryFound) return memoryFound;
+
   try {
     const db = await openDB();
     return new Promise((resolve) => {
-      const tx = db.transaction('file_diffs', 'readonly');
-      const store = tx.objectStore('file_diffs');
-      const request = store.get([sessionId, filepath]);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => resolve(null);
+      try {
+        const tx = db.transaction('file_diffs', 'readonly');
+        const store = tx.objectStore('file_diffs');
+        const request = store.get([sessionId, filepath]);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => resolve(null);
+      } catch (err) {
+        console.warn('IndexedDB 파일 Diff 트랜잭션 에러:', err);
+        resolve(null);
+      }
     });
   } catch (err) {
     console.warn('IndexedDB 파일 Diff 조회 실패:', err);
@@ -136,19 +173,26 @@ export async function getFileDiffFromDB(sessionId: string, filepath: string): Pr
  * 특정 세션의 캐시된 모든 파일 Diff 목록 가져오기
  */
 export async function getSessionFileDiffsFromDB(sessionId: string): Promise<CachedFileDiff[]> {
+  const memoryDiffs = Array.from(inMemoryCache.fileDiffs.values()).filter((d) => d.sessionId === sessionId);
+
   try {
     const db = await openDB();
     return new Promise((resolve) => {
-      const tx = db.transaction('file_diffs', 'readonly');
-      const store = tx.objectStore('file_diffs');
-      const index = store.index('sessionId');
-      const request = index.getAll(sessionId);
-      request.onsuccess = () => resolve(request.result || []);
-      request.onerror = () => resolve([]);
+      try {
+        const tx = db.transaction('file_diffs', 'readonly');
+        const store = tx.objectStore('file_diffs');
+        const index = store.index('sessionId');
+        const request = index.getAll(sessionId);
+        request.onsuccess = () => resolve(request.result && request.result.length > 0 ? request.result : memoryDiffs);
+        request.onerror = () => resolve(memoryDiffs);
+      } catch (err) {
+        console.warn('IndexedDB 세션 전체 Diff 트랜잭션 에러:', err);
+        resolve(memoryDiffs);
+      }
     });
   } catch (err) {
     console.warn('IndexedDB 세션 전체 Diff 조회 실패:', err);
-    return [];
+    return memoryDiffs;
   }
 }
 

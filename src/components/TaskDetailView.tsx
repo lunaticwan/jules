@@ -22,6 +22,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'timeline' | 'files'>('timeline');
   const [inputMsg, setInputMsg] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const approvePlanMutation = useApproveJulesPlanMutation();
   const sendMessageMutation = useSendJulesMessageMutation();
@@ -56,11 +57,12 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   const planSteps = Array.isArray(session.plan) ? session.plan : [];
 
   const handleApprove = async () => {
+    setActionError(null);
     try {
       const updated = await approvePlanMutation.mutateAsync(session.id);
       onUpdateSession(updated);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setActionError(`플랜 승인 실패: ${err?.message || '알 수 없는 오류 발생'}`);
     }
   };
 
@@ -68,6 +70,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
     e.preventDefault();
     if (!inputMsg.trim() || isSubmitting) return;
 
+    setActionError(null);
     try {
       const updated = await sendMessageMutation.mutateAsync({
         sessionId: session.id,
@@ -75,8 +78,8 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
       });
       onUpdateSession(updated);
       setInputMsg('');
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      setActionError(`메시지 전송 실패: ${err?.message || '알 수 없는 오류 발생'}`);
     }
   };
 
@@ -253,6 +256,14 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
 
       {/* Fixed Bottom Action Bar */}
       <footer className="border-t border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 p-3 backdrop-blur-md safe-pb shrink-0 space-y-2">
+        {actionError && (
+          <div className="flex items-center justify-between gap-2 bg-rose-50 dark:bg-rose-950/80 border border-rose-300 dark:border-rose-800 p-2 rounded-lg text-xs text-rose-700 dark:text-rose-300">
+            <span>{actionError}</span>
+            <button onClick={() => setActionError(null)} className="text-xs font-bold hover:underline">
+              ✕
+            </button>
+          </div>
+        )}
         {isAwaitingApproval && (
           <div className="flex items-center gap-2 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 p-2.5 rounded-xl mb-2">
             <span className="text-xs text-amber-800 dark:text-amber-300 flex-1 font-medium">

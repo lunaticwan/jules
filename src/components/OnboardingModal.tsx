@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Key, GitBranch, Save, Trash2, X, Info, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { getJulesApiKey, setJulesApiKey, clearJulesApiKey } from '../services/julesApi';
-import { getGitHubToken, setGitHubToken, clearGitHubToken } from '../services/githubApi';
+import { getJulesApiKey, setJulesApiKey, clearJulesApiKey, verifyJulesKey } from '../services/julesApi';
+import { getGitHubToken, setGitHubToken, clearGitHubToken, verifyGitHubToken } from '../services/githubApi';
 
 export interface OnboardingModalProps {
   isOpen: boolean;
@@ -24,6 +24,7 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const [showGithubToken, setShowGithubToken] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [verifyMsg, setVerifyMsg] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -46,11 +47,49 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   };
 
   const handleTestConnection = async () => {
-    setVerifyMsg('API 연결 검증 중...');
+    setIsVerifying(true);
+    setVerifyMsg('API 연결 및 크리덴셜 실시간 검증 중...');
     setErrorMsg('');
-    setTimeout(() => {
-      setVerifyMsg('API 키 및 GitHub 토큰 상태 저장이 성공적으로 완료되었습니다.');
-    }, 400);
+
+    try {
+      const results: string[] = [];
+      const errors: string[] = [];
+
+      // Jules Key 검증
+      if (julesKey.trim()) {
+        const julesRes = await verifyJulesKey(julesKey);
+        if (julesRes.success) {
+          results.push(julesRes.message);
+        } else {
+          errors.push(julesRes.message);
+        }
+      } else {
+        results.push('Jules API: Key 미입력 (로컬/Mock 모드로 동작)');
+      }
+
+      // GitHub Token 검증
+      if (githubToken.trim()) {
+        const ghRes = await verifyGitHubToken(githubToken);
+        if (ghRes.success) {
+          results.push(ghRes.message);
+        } else {
+          errors.push(ghRes.message);
+        }
+      } else {
+        results.push('GitHub Token: 미입력');
+      }
+
+      if (errors.length > 0) {
+        setErrorMsg(errors.join(' / '));
+      }
+      if (results.length > 0) {
+        setVerifyMsg(results.join(' | '));
+      }
+    } catch (err: any) {
+      setErrorMsg(`검증 중 오류 발생: ${err?.message || '알 수 없는 에러'}`);
+    } finally {
+      setIsVerifying(false);
+    }
   };
 
   const handleClearAll = () => {
@@ -158,9 +197,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
             <button
               type="button"
               onClick={handleTestConnection}
-              className="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors"
+              disabled={isVerifying}
+              className="w-full py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium border border-slate-700 transition-colors disabled:opacity-50"
             >
-              연결 및 크리덴셜 상태 검증
+              {isVerifying ? '검증 수행 중...' : '연결 및 크리덴셜 상태 검증'}
             </button>
           </div>
 

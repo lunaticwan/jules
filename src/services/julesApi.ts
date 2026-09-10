@@ -150,32 +150,90 @@ const INITIAL_MOCK_SESSIONS: JulesSession[] = [
 ];
 
 export function getJulesApiKey(): string {
-  return localStorage.getItem(STORAGE_KEYS.JULES_KEY) || '';
+  try {
+    return localStorage.getItem(STORAGE_KEYS.JULES_KEY) || '';
+  } catch (err) {
+    console.warn('LocalStorage 접근 실패 (Jules API Key):', err);
+    return '';
+  }
 }
 
 export function setJulesApiKey(key: string): void {
-  localStorage.setItem(STORAGE_KEYS.JULES_KEY, key.trim());
+  try {
+    localStorage.setItem(STORAGE_KEYS.JULES_KEY, key.trim());
+  } catch (err) {
+    console.warn('LocalStorage 저장 실패 (Jules API Key):', err);
+  }
 }
 
 export function clearJulesApiKey(): void {
-  localStorage.removeItem(STORAGE_KEYS.JULES_KEY);
+  try {
+    localStorage.removeItem(STORAGE_KEYS.JULES_KEY);
+  } catch (err) {
+    console.warn('LocalStorage 삭제 실패 (Jules API Key):', err);
+  }
 }
 
-export function getStoredSessions(): JulesSession[] {
-  const data = localStorage.getItem(STORAGE_KEYS.MOCK_SESSIONS);
-  if (!data) {
-    localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(INITIAL_MOCK_SESSIONS));
-    return INITIAL_MOCK_SESSIONS;
+/**
+ * Jules API Key 유효성 검증
+ */
+export async function verifyJulesKey(keyInput?: string): Promise<{ success: boolean; message: string }> {
+  const apiKey = keyInput !== undefined ? keyInput.trim() : getJulesApiKey();
+  if (!apiKey) {
+    return { success: false, message: 'Jules API 키가 입력되지 않았음 (Mock 모드 동작)' };
   }
+
   try {
-    return JSON.parse(data);
-  } catch {
-    return INITIAL_MOCK_SESSIONS;
+    const res = await julesClient.get('/sessions', {
+      params: { key: apiKey }
+    });
+    if (res.status === 200) {
+      return { success: true, message: 'Jules API 연결 검증 성공' };
+    }
+    return { success: false, message: `Jules API 응답 상태 이상 (${res.status})` };
+  } catch (err: any) {
+    const status = err?.response?.status;
+    if (status === 401 || status === 403) {
+      return { success: false, message: '유효하지 않거나 권한이 없는 Jules API 키임' };
+    }
+    return { success: false, message: `Jules API 검증 실패: ${err?.message || '네트워크 오류'}` };
   }
+}
+
+let inMemorySessionsCache: JulesSession[] | null = null;
+
+export function getStoredSessions(): JulesSession[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEYS.MOCK_SESSIONS);
+    if (!data) {
+      if (!inMemorySessionsCache) inMemorySessionsCache = INITIAL_MOCK_SESSIONS;
+      try {
+        localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(INITIAL_MOCK_SESSIONS));
+      } catch {}
+      return inMemorySessionsCache;
+    }
+    const parsed = JSON.parse(data);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      inMemorySessionsCache = parsed;
+      return parsed;
+    }
+  } catch (err) {
+    console.warn('LocalStorage 세션 파싱 실패, 인메모리 반환:', err);
+  }
+
+  if (!inMemorySessionsCache) {
+    inMemorySessionsCache = INITIAL_MOCK_SESSIONS;
+  }
+  return inMemorySessionsCache;
 }
 
 export function saveStoredSessions(sessions: JulesSession[]): void {
-  localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(sessions));
+  inMemorySessionsCache = sessions;
+  try {
+    localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(sessions));
+  } catch (err) {
+    console.warn('LocalStorage 저장 실패 (In-Memory 캐시 사용):', err);
+  }
 }
 
 /**
