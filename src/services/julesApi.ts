@@ -1,65 +1,109 @@
+import { z } from 'zod';
 import { julesClient } from './apiClient';
 
 /**
- * Jules 대화 타임라인 내 단일 메시지 인터페이스
+ * Zod 기반 Jules 메시지 객체 검증 스키마
  */
-export interface JulesMessage {
-  /** 메시지 고유 식별자 */
-  id: string;
-  /** 메시지 발신자 유형 ('user' | 'jules' | 'system') */
-  sender: 'user' | 'jules' | 'system';
-  /** 메시지본문 텍스트 */
-  content: string;
-  /** ISO 8601 생성 일시 */
-  timestamp: string;
-  /** 메시지 표시 분류 타입 */
-  type?: 'text' | 'thought' | 'plan' | 'step';
-}
+export const JulesMessageSchema = z.object({
+  id: z.string().default(() => `msg-${Date.now()}`),
+  sender: z.enum(['user', 'jules', 'system']).default('jules'),
+  content: z.string().default(''),
+  timestamp: z.string().default(() => new Date().toISOString()),
+  type: z.enum(['text', 'thought', 'plan', 'step']).optional(),
+});
 
 /**
- * Jules 작업 세션 실행 플랜의 단계 항목
+ * Zod 기반 Jules 실행 플랜 단계 스키마
  */
-export interface JulesPlanStep {
-  /** 플랜 단계 순서 인덱스 */
-  index: number;
-  /** 플랜 단계 요약 제목 */
-  title: string;
-  /** 상세 동작 설명 */
-  description?: string;
-  /** 실행 상태 ('pending' | 'in_progress' | 'completed' | 'failed') */
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
-}
+export const JulesPlanStepSchema = z.object({
+  index: z.number().default(1),
+  title: z.string().default(''),
+  description: z.string().optional(),
+  status: z.enum(['pending', 'in_progress', 'completed', 'failed']).default('pending'),
+});
 
 /**
- * Jules REST API 통합 작업 세션 데이터 인터페이스
+ * Zod 기반 Jules 세션 객체 검증 스키마
  */
-export interface JulesSession {
-  /** 세션 단축 ID (예: 'sess-101') */
-  id: string;
-  /** 세션 리소스 Full Path (예: 'sessions/12345') */
-  name: string;
-  /** GitHub 저장소 식별자 (예: 'owner/repo') */
-  repository: string;
-  /** 기준 브랜치 (기본값: 'main') */
-  baseBranch: string;
-  /** 사용자 원본 프롬프트 지시사항 */
-  prompt: string;
-  /** 세션 현재 상태 */
-  state: 'IN_PROGRESS' | 'AWAITING_APPROVAL' | 'COMPLETED' | 'FAILED';
-  /** 생성 일시 (ISO 8601) */
-  createdAt: string;
-  /** 최근 업데이트 일시 (ISO 8601) */
-  updatedAt: string;
-  /** 요약 타이틀 */
-  title?: string;
-  /** 생성된 GitHub PR URL */
-  prUrl?: string;
-  /** 생성된 GitHub PR 번호 */
-  prNumber?: number;
-  /** 실행 플랜 단계 목록 */
-  plan?: JulesPlanStep[];
-  /** 대화 타임라인 메시지 목록 */
-  messages: JulesMessage[];
+export const JulesSessionSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  repository: z.string().default('acme/mobile-pwa'),
+  baseBranch: z.string().default('main'),
+  prompt: z.string().default(''),
+  state: z.enum(['IN_PROGRESS', 'AWAITING_APPROVAL', 'COMPLETED', 'FAILED']).default('IN_PROGRESS'),
+  createdAt: z.string().default(() => new Date().toISOString()),
+  updatedAt: z.string().default(() => new Date().toISOString()),
+  title: z.string().optional(),
+  prUrl: z.string().optional(),
+  prNumber: z.number().optional(),
+  plan: z.array(JulesPlanStepSchema).optional().default([]),
+  messages: z.array(JulesMessageSchema).default([]),
+});
+
+/** Zod 파싱 기반 인퍼런스 타입 정의 */
+export type JulesMessage = z.infer<typeof JulesMessageSchema>;
+export type JulesPlanStep = z.infer<typeof JulesPlanStepSchema>;
+export type JulesSession = z.infer<typeof JulesSessionSchema>;
+
+/**
+ * 단일 세션 데이터 검증 및 보정 파서
+ */
+export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'): JulesSession {
+  const result = JulesSessionSchema.safeParse(data);
+  if (result.success) {
+    return result.data;
+  }
+
+  const rawObj = typeof data === 'object' && data !== null ? (data as Record<string, any>) : {};
+  const id = String(rawObj.id || rawObj.name?.split('/')?.pop() || fallbackId);
+  const prompt = String(rawObj.prompt || rawObj.title || '작업 요청 내용');
+
+  let repo = String(rawObj.repository || rawObj.repo || 'acme/mobile-pwa');
+  if (!repo || repo === 'unknown/repository') {
+    repo = 'acme/mobile-pwa';
+  }
+
+  return {
+    id,
+    name: String(rawObj.name || `sessions/${id}`),
+    repository: repo,
+    baseBranch: String(rawObj.baseBranch || 'main'),
+    prompt,
+    state: (['IN_PROGRESS', 'AWAITING_APPROVAL', 'COMPLETED', 'FAILED'].includes(rawObj.state)
+      ? rawObj.state
+      : 'IN_PROGRESS') as JulesSession['state'],
+    createdAt: String(rawObj.createdAt || rawObj.createTime || new Date().toISOString()),
+    updatedAt: String(rawObj.updatedAt || rawObj.updateTime || new Date().toISOString()),
+    title: String(rawObj.title || prompt || 'Untitled Session'),
+    prUrl: rawObj.prUrl || rawObj.pullRequestUrl || undefined,
+    prNumber: rawObj.prNumber || rawObj.pullRequestNumber || undefined,
+    plan: Array.isArray(rawObj.plan)
+      ? rawObj.plan.map((p: any, i: number) => ({
+          index: p.index || i + 1,
+          title: p.title || '플랜 단계',
+          description: p.description,
+          status: p.status || 'pending',
+        }))
+      : [],
+    messages: Array.isArray(rawObj.messages) && rawObj.messages.length > 0
+      ? rawObj.messages.map((m: any, i: number) => ({
+          id: String(m.id || `msg-${i}`),
+          sender: (['user', 'jules', 'system'].includes(m.sender) ? m.sender : 'jules') as JulesMessage['sender'],
+          content: String(m.content || ''),
+          timestamp: String(m.timestamp || new Date().toISOString()),
+          type: m.type,
+        }))
+      : [
+          {
+            id: `msg-${id}-1`,
+            sender: 'user',
+            content: prompt,
+            timestamp: new Date().toISOString(),
+            type: 'text',
+          },
+        ],
+  };
 }
 
 const STORAGE_KEYS = {
@@ -273,37 +317,7 @@ export function getStoredSessions(): JulesSession[] {
     // cached
   }
 
-  return list.map((s, index) => ({
-    ...s,
-    id: s.id || `sess-${index + 101}`,
-    name: s.name || `sessions/${s.id || `sess-${index + 101}`}`,
-    repository: (!s.repository || s.repository === 'unknown/repository') ? 'acme/mobile-pwa' : s.repository,
-    baseBranch: s.baseBranch || 'main',
-    prompt: s.prompt || s.title || 'No prompt provided',
-    state: s.state || 'IN_PROGRESS',
-    createdAt: s.createdAt || new Date().toISOString(),
-    updatedAt: s.updatedAt || new Date().toISOString(),
-    title: s.title || s.prompt || 'Untitled Session',
-    plan: Array.isArray(s.plan) ? s.plan : [],
-    messages: Array.isArray(s.messages) && s.messages.length > 0
-      ? s.messages
-      : [
-          {
-            id: `msg-fallback-1`,
-            sender: 'user',
-            content: s.prompt || '작업 요청',
-            timestamp: s.createdAt || new Date().toISOString(),
-            type: 'text',
-          },
-          {
-            id: `msg-fallback-2`,
-            sender: 'jules',
-            content: '작업 세션이 진행 중입니다.',
-            timestamp: s.updatedAt || new Date().toISOString(),
-            type: 'thought',
-          },
-        ],
-  }));
+  return list.map((s, index) => safeParseJulesSession(s, `sess-${index + 101}`));
 }
 
 /**
@@ -331,36 +345,7 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
     const response = await julesClient.get('/sessions');
     const data = response.data;
     if (Array.isArray(data.sessions)) {
-      const mapped = data.sessions.map((s: any, index: number) => ({
-        id: s.id || s.name?.split('/')?.pop() || `session-${index}`,
-        name: s.name || `sessions/session-${index}`,
-        repository: s.repository || s.repo || s.targetRepository || 'acme/mobile-pwa',
-        baseBranch: s.baseBranch || 'main',
-        prompt: s.prompt || s.title || 'No prompt provided',
-        state: s.state || 'IN_PROGRESS',
-        createdAt: s.createdAt || s.createTime || new Date().toISOString(),
-        updatedAt: s.updatedAt || s.updateTime || new Date().toISOString(),
-        title: s.title || s.prompt || 'Untitled Session',
-        prUrl: s.prUrl || s.pullRequestUrl || undefined,
-        prNumber: s.prNumber || s.pullRequestNumber || undefined,
-        plan: Array.isArray(s.plan) ? s.plan : [],
-        messages: Array.isArray(s.messages) && s.messages.length > 0 ? s.messages : [
-          {
-            id: `msg-${index}-1`,
-            sender: 'user',
-            content: s.prompt || s.title || '작업 요청 내용',
-            timestamp: s.createdAt || new Date().toISOString(),
-            type: 'text',
-          },
-          {
-            id: `msg-${index}-2`,
-            sender: 'jules',
-            content: '요청 사항을 분석하고 작업을 수행 중입니다.',
-            timestamp: s.updatedAt || new Date().toISOString(),
-            type: 'thought',
-          },
-        ],
-      }));
+      const mapped = data.sessions.map((s: any, index: number) => safeParseJulesSession(s, `session-${index}`));
       saveStoredSessions(mapped);
       return mapped;
     }
@@ -380,30 +365,7 @@ export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesS
     try {
       const response = await julesClient.get(`/${sessionId}`);
       if (response.data) {
-        const s = response.data;
-        return {
-          id: s.id || sessionId,
-          name: s.name || `sessions/${sessionId}`,
-          repository: s.repository || s.repo || 'acme/mobile-pwa',
-          baseBranch: s.baseBranch || 'main',
-          prompt: s.prompt || s.title || '',
-          state: s.state || 'IN_PROGRESS',
-          createdAt: s.createdAt || new Date().toISOString(),
-          updatedAt: s.updatedAt || new Date().toISOString(),
-          title: s.title || s.prompt || 'Untitled Session',
-          prUrl: s.prUrl || s.pullRequestUrl || undefined,
-          prNumber: s.prNumber || s.pullRequestNumber || undefined,
-          plan: Array.isArray(s.plan) ? s.plan : [],
-          messages: Array.isArray(s.messages) && s.messages.length > 0 ? s.messages : [
-            {
-              id: `msg-detail-1`,
-              sender: 'user',
-              content: s.prompt || '작업 요청 사항',
-              timestamp: s.createdAt || new Date().toISOString(),
-              type: 'text',
-            },
-          ],
-        };
+        return safeParseJulesSession(response.data, sessionId);
       }
     } catch (err) {
       console.warn('Jules 세션 상세 API 조회 실패, 로컬 세션 조회로 이동:', err);

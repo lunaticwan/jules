@@ -1,4 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { parsePatch } from 'diff';
+
+type ParsedDiff = ReturnType<typeof parsePatch>[number];
 import { ChevronRight, ChevronDown, FilePlus, FileMinus, FileCode, Loader2 } from 'lucide-react';
 import { getFileDiffFromDB, saveFileDiffToDB, CachedFileDiff } from '../services/db';
 
@@ -78,19 +81,7 @@ const FileDiffItem = React.memo<{
               IndexedDB / 지연 로딩 처리 중...
             </div>
           ) : diffData ? (
-            <pre className="text-xs font-mono leading-relaxed overflow-x-auto whitespace-pre p-2 rounded bg-slate-900 text-slate-200 dark:bg-slate-900/90 border border-slate-800">
-              {diffData.patch.split('\n').map((line, idx) => {
-                let lineStyle = 'text-slate-300';
-                if (line.startsWith('+')) lineStyle = 'text-emerald-400 bg-emerald-950/30';
-                if (line.startsWith('-')) lineStyle = 'text-rose-400 bg-rose-950/30';
-                if (line.startsWith('@@')) lineStyle = 'text-blue-400 font-bold';
-                return (
-                  <div key={idx} className={`${lineStyle} px-1 rounded`}>
-                    {line}
-                  </div>
-                );
-              })}
-            </pre>
+            <ParsedDiffView patch={diffData.patch} />
           ) : null}
         </div>
       )}
@@ -99,6 +90,91 @@ const FileDiffItem = React.memo<{
 });
 
 FileDiffItem.displayName = 'FileDiffItem';
+
+/**
+ * diff 패키지의 parsePatch 기반 헝크/라인 단위 고도화 디프 뷰어
+ */
+const ParsedDiffView: React.FC<{ patch: string }> = React.memo(({ patch }) => {
+  const parsed = useMemo<ParsedDiff[]>(() => {
+    try {
+      return parsePatch(patch);
+    } catch {
+      return [];
+    }
+  }, [patch]);
+
+  if (!parsed || parsed.length === 0 || !parsed[0]?.hunks?.length) {
+    // 폴백 기본 줄 단위 파싱
+    return (
+      <pre className="text-xs font-mono leading-relaxed overflow-x-auto whitespace-pre p-2 rounded bg-slate-900 text-slate-200 dark:bg-slate-900/90 border border-slate-800">
+        {patch.split('\n').map((line, idx) => {
+          let lineStyle = 'text-slate-300';
+          if (line.startsWith('+')) lineStyle = 'text-emerald-400 bg-emerald-950/30';
+          if (line.startsWith('-')) lineStyle = 'text-rose-400 bg-rose-950/30';
+          if (line.startsWith('@@')) lineStyle = 'text-blue-400 font-bold';
+          return (
+            <div key={idx} className={`${lineStyle} px-1 rounded`}>
+              {line}
+            </div>
+          );
+        })}
+      </pre>
+    );
+  }
+
+  return (
+    <div className="text-xs font-mono overflow-x-auto rounded bg-slate-900 text-slate-200 border border-slate-800 p-1 space-y-2">
+      {parsed[0].hunks.map((hunk, hunkIdx) => {
+        let oldLineNum = hunk.oldStart;
+        let newLineNum = hunk.newStart;
+
+        return (
+          <div key={hunkIdx} className="space-y-0.5">
+            <div className="bg-slate-800/80 text-blue-400 font-bold px-2 py-0.5 rounded text-[11px]">
+              @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
+            </div>
+            {hunk.lines.map((line, lineIdx) => {
+              const isAdd = line.startsWith('+');
+              const isDel = line.startsWith('-');
+
+              let displayOld = '';
+              let displayNew = '';
+
+              if (isAdd) {
+                displayNew = String(newLineNum++);
+              } else if (isDel) {
+                displayOld = String(oldLineNum++);
+              } else {
+                displayOld = String(oldLineNum++);
+                displayNew = String(newLineNum++);
+              }
+
+              let lineBg = 'hover:bg-slate-800/40 text-slate-300';
+              if (isAdd) lineBg = 'bg-emerald-950/40 text-emerald-300';
+              if (isDel) lineBg = 'bg-rose-950/40 text-rose-300';
+
+              return (
+                <div key={lineIdx} className={`flex items-start px-1 py-0.5 rounded select-none ${lineBg}`}>
+                  <span className="w-8 shrink-0 text-right pr-1 text-slate-600 select-none text-[10px]">
+                    {displayOld}
+                  </span>
+                  <span className="w-8 shrink-0 text-right pr-2 text-slate-600 select-none text-[10px]">
+                    {displayNew}
+                  </span>
+                  <span className="flex-1 whitespace-pre break-all select-text font-mono">
+                    {line}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+});
+
+ParsedDiffView.displayName = 'ParsedDiffView';
 
 export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({ sessionId, files = DEFAULT_FILES }) => {
   const [openFiles, setOpenFiles] = useState<Record<string, boolean>>({});
