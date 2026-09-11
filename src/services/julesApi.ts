@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import secureJsonParse from 'secure-json-parse';
 import { julesClient } from './apiClient';
 import { getLogTimestamp } from '../utils/logger';
 
@@ -366,7 +367,7 @@ export function getStoredSessions(): JulesSession[] {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.MOCK_SESSIONS);
     if (data) {
-      const parsed = JSON.parse(data);
+      const parsed = secureJsonParse.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
         list = parsed;
       }
