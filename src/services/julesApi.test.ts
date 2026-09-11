@@ -89,4 +89,39 @@ describe('Jules API Data Mapping & Cache Test', () => {
     expect(parsed.prUrl).toBe('https://github.com/lunaticwan/jules/pull/12');
     expect(parsed.prNumber).toBe(12);
   });
+
+  it('safeParseJulesSession() - applies lunaticwan/jules default repository fallback when missing', async () => {
+    const { safeParseJulesSession } = await import('./julesApi');
+
+    const rawDataNoRepo = {
+      id: 'sessions/12365064714472776148',
+      title: 'UI 개선 작업',
+      createTime: '2026-09-11T00:00:00Z',
+    };
+
+    const parsed = safeParseJulesSession(rawDataNoRepo);
+    expect(parsed.repository).toBe('lunaticwan/jules');
+    expect(parsed.id).toBe('12365064714472776148');
+  });
+
+  it('safeParseJulesSession() - parses history and PR URL in prompt text', async () => {
+    const { safeParseJulesSession } = await import('./julesApi');
+
+    const rawDataWithHistory = {
+      id: 'sess-history-1',
+      prompt: 'https://github.com/lunaticwan/jules/pull/99 PR 수정을 검토해주세요',
+      history: [
+        { id: 'h1', role: 'user', content: '초기 문의' },
+        { id: 'h2', role: 'model', content: '답변 결과' },
+      ],
+    };
+
+    const parsed = safeParseJulesSession(rawDataWithHistory);
+    expect(parsed.repository).toBe('lunaticwan/jules');
+    expect(parsed.prUrl).toBe('https://github.com/lunaticwan/jules/pull/99');
+    expect(parsed.prNumber).toBe(99);
+    expect(parsed.messages.length).toBe(2);
+    expect(parsed.messages[0].sender).toBe('user');
+    expect(parsed.messages[1].sender).toBe('jules');
+  });
 });
