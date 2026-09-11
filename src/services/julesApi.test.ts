@@ -71,4 +71,22 @@ describe('Jules API Data Mapping & Cache Test', () => {
     expect(result[0].messages.length).toBeGreaterThan(0);
     expect(result[0].messages[0].content).toBe('Refactor UI');
   });
+
+  it('safeParseJulesSession() - infers repository from PR URL when repository field is missing', async () => {
+    const { safeParseJulesSession } = await import('./julesApi');
+
+    const rawDataNoRepo = {
+      id: 'test-infer-1',
+      title: 'Inferred Repo Task',
+      outputs: {
+        pullRequestUrl: 'https://github.com/lunaticwan/jules/pull/12',
+        pullRequestNumber: 12,
+      },
+    };
+
+    const parsed = safeParseJulesSession(rawDataNoRepo);
+    expect(parsed.repository).toBe('lunaticwan/jules');
+    expect(parsed.prUrl).toBe('https://github.com/lunaticwan/jules/pull/12');
+    expect(parsed.prNumber).toBe(12);
+  });
 });
