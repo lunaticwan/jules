@@ -195,6 +195,7 @@ export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
+    console.log(`[ChangedFilesView] [INIT_LOAD] sessionId: ${sessionId}, repo: ${repository}, prNumber: ${prNumber}, propsFilesCount: ${propsFiles?.length ?? 0}`);
     if (propsFiles && propsFiles.length > 0) {
       setFileList(propsFiles);
       return;
@@ -205,13 +206,16 @@ export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({
       setFetchError(null);
       fetchPRFiles(repository, prNumber)
         .then((fetched) => {
+          console.log(`[ChangedFilesView] [FETCHED_PR_FILES] count: ${fetched?.length ?? 0}`, fetched);
           if (fetched && fetched.length > 0) {
             setFileList(fetched);
           } else {
+            console.warn(`[ChangedFilesView] [FALLBACK_DEFAULT_FILES] PR 파일이 비어있음`);
             setFileList(DEFAULT_FILES);
           }
         })
         .catch((err) => {
+          console.error(`[ChangedFilesView] [FETCH_PR_FILES_ERROR]`, err);
           setFetchError(`GitHub PR 변경 파일 조회 오류: ${err?.message || '실패'}`);
           setFileList(DEFAULT_FILES);
         })
@@ -219,21 +223,25 @@ export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({
           setIsFetchingFiles(false);
         });
     } else {
+      console.warn(`[ChangedFilesView] [NO_PR_INFO_FALLBACK] repository: ${repository}, prNumber: ${prNumber}`);
       setFileList(DEFAULT_FILES);
     }
-  }, [repository, prNumber, propsFiles]);
+  }, [sessionId, repository, prNumber, propsFiles]);
 
   const toggleFile = useCallback(async (filepath: string) => {
     setOpenFiles((prev) => {
       const isNextOpen = !prev[filepath];
+      console.log(`[ChangedFilesView] [TOGGLE_FILE] filepath: ${filepath}, nextOpen: ${isNextOpen}`);
       if (isNextOpen && !diffDataMap[filepath]) {
         setLoadingMap((lPrev) => ({ ...lPrev, [filepath]: true }));
 
         getFileDiffFromDB(sessionId, filepath).then((cached) => {
           if (cached) {
+            console.log(`[ChangedFilesView] [INDEXEDDB_CACHE_HIT] sessionId: ${sessionId}, filepath: ${filepath}`);
             setDiffDataMap((dPrev) => ({ ...dPrev, [filepath]: cached }));
             setLoadingMap((lPrev) => ({ ...lPrev, [filepath]: false }));
           } else {
+            console.log(`[ChangedFilesView] [INDEXEDDB_CACHE_MISS] generating & saving diff...`);
             const fileInfo = fileList.find((f) => f.filepath === filepath);
             const patchText = fileInfo?.patch || generateMockPatch(filepath, fileInfo?.status || 'modified');
 
@@ -248,6 +256,7 @@ export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({
             };
 
             saveFileDiffToDB(mockDiff).then(() => {
+              console.log(`[ChangedFilesView] [INDEXEDDB_SAVED_SUCCESS] filepath: ${filepath}`);
               setDiffDataMap((dPrev) => ({ ...dPrev, [filepath]: mockDiff }));
               setLoadingMap((lPrev) => ({ ...lPrev, [filepath]: false }));
             });

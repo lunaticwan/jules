@@ -52,8 +52,11 @@ export type JulesSession = z.infer<typeof JulesSessionSchema>;
  * 단일 세션 데이터 검증 및 보정 파서
  */
 export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'): JulesSession {
-  console.log(`[${getLogTimestamp()}][safeParseJulesSession] [INPUT_RAW_DATA]`, data);
+  const timestamp = getLogTimestamp();
   const rawObj = typeof data === 'object' && data !== null ? (data as Record<string, any>) : {};
+  const rawKeys = Object.keys(rawObj);
+  console.log(`[${timestamp}][safeParseJulesSession] [INPUT_RAW_DATA] keys: [${rawKeys.join(', ')}]`, data);
+
   const rawId = String(rawObj.id || rawObj.name?.split('/')?.pop() || fallbackId);
   const id = rawId.startsWith('sessions/') ? rawId.replace(/^sessions\//, '') : rawId;
   const prompt = String(rawObj.prompt || rawObj.title || rawObj.userPrompt || rawObj.description || '작업 요청 내용');
@@ -143,7 +146,10 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
 
   // Jules API activities / outputs / history / steps / messages 필드 통합 파싱
   let parsedMessages: JulesMessage[] = [];
+  let msgSource = 'fallback';
+
   if (Array.isArray(rawObj.messages) && rawObj.messages.length > 0) {
+    msgSource = 'messages';
     parsedMessages = rawObj.messages.map((m: any, i: number) => ({
       id: String(m.id || `msg-${i}`),
       sender: (['user', 'jules', 'system'].includes(m.sender) ? m.sender : 'jules') as JulesMessage['sender'],
@@ -152,6 +158,7 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
       type: m.type,
     }));
   } else if (Array.isArray(rawObj.activities) && rawObj.activities.length > 0) {
+    msgSource = 'activities';
     parsedMessages = rawObj.activities.map((act: any, i: number) => {
       const isUser = act.actor === 'USER' || act.sender === 'USER' || act.sender === 'user' || act.role === 'user';
       return {
@@ -163,6 +170,7 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
       };
     });
   } else if (Array.isArray(rawObj.history) && rawObj.history.length > 0) {
+    msgSource = 'history';
     parsedMessages = rawObj.history.map((h: any, i: number) => {
       const isUser = h.role === 'user' || h.sender === 'user' || h.actor === 'USER';
       return {
@@ -174,6 +182,7 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
       };
     });
   } else if (Array.isArray(rawObj.turns) && rawObj.turns.length > 0) {
+    msgSource = 'turns';
     parsedMessages = rawObj.turns.map((t: any, i: number) => {
       const isUser = t.role === 'user' || t.userQuery;
       return {
@@ -223,7 +232,17 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
     messages: parsedMessages,
   };
 
-  console.log(`[${getLogTimestamp()}][safeParseJulesSession] [PARSED_RESULT]`, parsedSession);
+  console.log(`[${timestamp}][safeParseJulesSession] [PARSED_DETAILS]`, {
+    id,
+    repository: repo,
+    prUrl,
+    prNumber,
+    msgSource,
+    messageCount: parsedMessages.length,
+    planStepCount: parsedSession.plan?.length || 0,
+    state: parsedSession.state,
+  });
+  console.log(`[${timestamp}][safeParseJulesSession] [PARSED_RESULT]`, parsedSession);
   return parsedSession;
 }
 
