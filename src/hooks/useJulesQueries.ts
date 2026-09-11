@@ -22,12 +22,12 @@ export const JULES_QUERY_KEYS = {
 /**
  * Jules 전체 세션 목록을 조회하는 React Query 커스텀 훅
  */
-export function useJulesSessionsQuery(): UseQueryResult<JulesSession[], Error> {
+export function useJulesSessionsQuery(knownRepos: string[] = []): UseQueryResult<JulesSession[], Error> {
   return useQuery<JulesSession[]>({
     queryKey: JULES_QUERY_KEYS.sessions,
     queryFn: async () => {
       console.log('[useJulesSessionsQuery] [FETCH_START]');
-      const res = await fetchJulesSessions();
+      const res = await fetchJulesSessions(knownRepos);
       console.log('[useJulesSessionsQuery] [FETCH_SUCCESS]', res);
       return res;
     },
@@ -39,14 +39,15 @@ export function useJulesSessionsQuery(): UseQueryResult<JulesSession[], Error> {
  * 단일 Jules 세션의 상세 정보를 조회하는 React Query 커스텀 훅
  */
 export function useJulesSessionDetailQuery(
-  sessionId: string | null | undefined
+  sessionId: string | null | undefined,
+  knownRepos: string[] = []
 ): UseQueryResult<JulesSession | null, Error> {
   return useQuery<JulesSession | null>({
     queryKey: JULES_QUERY_KEYS.sessionDetail(sessionId || ''),
     queryFn: async () => {
       console.log('[useJulesSessionDetailQuery] [FETCH_START] sessionId:', sessionId);
       if (!sessionId) return null;
-      const res = await fetchJulesSessionDetail(sessionId);
+      const res = await fetchJulesSessionDetail(sessionId, knownRepos);
       console.log('[useJulesSessionDetailQuery] [FETCH_SUCCESS]', res);
       return res;
     },

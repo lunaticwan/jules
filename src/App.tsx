@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { JulesSession, getJulesApiKey } from './services/julesApi';
 import { useJulesSessionsQuery, useApproveJulesPlanMutation } from './hooks/useJulesQueries';
+import { useUserRepositoriesQuery } from './hooks/useGitHubQueries';
 import { DashboardView } from './components/DashboardView';
 import { TaskDetailView } from './components/TaskDetailView';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -18,7 +19,8 @@ const KeyboardShortcutsModal = lazy(() =>
 );
 
 export default function App() {
-  const { data: sessions = [], isLoading, error: queryError, refetch } = useJulesSessionsQuery();
+  const { data: userRepos = [] } = useUserRepositoriesQuery();
+  const { data: sessions = [], isLoading, error: queryError, refetch } = useJulesSessionsQuery(userRepos);
   const approvePlanMutation = useApproveJulesPlanMutation();
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
