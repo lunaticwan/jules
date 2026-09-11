@@ -104,6 +104,20 @@ describe('Jules API Data Mapping & Cache Test', () => {
     expect(parsed.id).toBe('12365064714472776148');
   });
 
+  it('safeParseJulesSession() - does not misidentify "UI/UX" in prompt as repository name', async () => {
+    const { safeParseJulesSession } = await import('./julesApi');
+
+    const rawDataWithUiUxTitle = {
+      id: 'sessions/10337981166895172531',
+      title: '사전 서비스 UI/UX 개선 및 언어팩 고도화',
+      createTime: '2026-09-11T01:43:55Z',
+    };
+
+    const parsed = safeParseJulesSession(rawDataWithUiUxTitle);
+    expect(parsed.repository).toBe('(저장소 정보 미수신)');
+    expect(parsed.repository).not.toBe('UI/UX');
+  });
+
   it('safeParseJulesSession() - parses history and PR URL in prompt text', async () => {
     const { safeParseJulesSession } = await import('./julesApi');
 
