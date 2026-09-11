@@ -90,7 +90,7 @@ describe('Jules API Data Mapping & Cache Test', () => {
     expect(parsed.prNumber).toBe(12);
   });
 
-  it('safeParseJulesSession() - applies lunaticwan/jules default repository fallback when missing', async () => {
+  it('safeParseJulesSession() - applies (저장소 정보 미수신) repository fallback when missing', async () => {
     const { safeParseJulesSession } = await import('./julesApi');
 
     const rawDataNoRepo = {
@@ -100,7 +100,7 @@ describe('Jules API Data Mapping & Cache Test', () => {
     };
 
     const parsed = safeParseJulesSession(rawDataNoRepo);
-    expect(parsed.repository).toBe('lunaticwan/jules');
+    expect(parsed.repository).toBe('(저장소 정보 미수신)');
     expect(parsed.id).toBe('12365064714472776148');
   });
 

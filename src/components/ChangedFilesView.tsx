@@ -21,12 +21,6 @@ interface ChangedFilesViewProps {
   files?: FileItem[];
 }
 
-const DEFAULT_FILES: FileItem[] = [
-  { filepath: 'src/components/Navigation.tsx', status: 'modified', additions: 12, deletions: 4 },
-  { filepath: 'src/styles/theme.css', status: 'modified', additions: 28, deletions: 15 },
-  { filepath: 'src/hooks/useMobileDetect.ts', status: 'added', additions: 45, deletions: 0 },
-  { filepath: 'src/utils/deprecatedHelper.ts', status: 'deleted', additions: 0, deletions: 32 },
-];
 
 /**
  * 개별 파일 디프 항목 컴포넌트 (React.memo 적용으로 불필요한 전체 리렌더링 방지)
@@ -201,30 +195,25 @@ export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({
       return;
     }
 
-    if (repository && prNumber) {
+    if (repository && prNumber && !repository.includes('미수신')) {
       setIsFetchingFiles(true);
       setFetchError(null);
       fetchPRFiles(repository, prNumber)
         .then((fetched) => {
           console.log(`[ChangedFilesView] [FETCHED_PR_FILES] count: ${fetched?.length ?? 0}`, fetched);
-          if (fetched && fetched.length > 0) {
-            setFileList(fetched);
-          } else {
-            console.warn(`[ChangedFilesView] [FALLBACK_DEFAULT_FILES] PR 파일이 비어있음`);
-            setFileList(DEFAULT_FILES);
-          }
+          setFileList(fetched || []);
         })
         .catch((err) => {
           console.error(`[ChangedFilesView] [FETCH_PR_FILES_ERROR]`, err);
-          setFetchError(`GitHub PR 변경 파일 조회 오류: ${err?.message || '실패'}`);
-          setFileList(DEFAULT_FILES);
+          setFetchError(`GitHub PR 변경 파일 조회 실패: ${err?.message || '네트워크/권한 오류'}`);
+          setFileList([]);
         })
         .finally(() => {
           setIsFetchingFiles(false);
         });
     } else {
-      console.warn(`[ChangedFilesView] [NO_PR_INFO_FALLBACK] repository: ${repository}, prNumber: ${prNumber}`);
-      setFileList(DEFAULT_FILES);
+      console.warn(`[ChangedFilesView] [NO_PR_INFO] repository: ${repository}, prNumber: ${prNumber}`);
+      setFileList([]);
     }
   }, [sessionId, repository, prNumber, propsFiles]);
 
@@ -288,6 +277,18 @@ export const ChangedFilesView: React.FC<ChangedFilesViewProps> = ({
       {fetchError && (
         <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-xs text-rose-300">
           {fetchError}
+        </div>
+      )}
+
+      {!isFetchingFiles && fileList.length === 0 && (
+        <div className="p-6 rounded-xl border border-dashed border-slate-300 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30">
+          {!prNumber || !repository || repository.includes('미수신') ? (
+            <p>GitHub PR 정보 또는 레파지토리가 아직 생성/연동되지 않은 세션입니다.</p>
+          ) : fetchError ? (
+            <p className="text-rose-500">{fetchError}</p>
+          ) : (
+            <p>변경된 파일이 없거나 PR 변경사항을 불러오지 못했습니다.</p>
+          )}
         </div>
       )}
 

@@ -139,9 +139,9 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
     }
   }
 
-  // 여전히 누락되었거나 기본 템플릿 스트링인 경우 사용자의 메인 서비스 레포지토리인 'lunaticwan/jules'로 보정
+  // 여전히 누락되었거나 기본 템플릿 스트링인 경우 정보를 가져오지 못했음을 명확히 표시
   if (!repo || repo === 'owner/repository' || repo === 'unknown/repository' || !repo.includes('/')) {
-    repo = 'lunaticwan/jules';
+    repo = '(저장소 정보 미수신)';
   }
 
   // Jules API activities / outputs / history / steps / messages 필드 통합 파싱
