@@ -3,7 +3,7 @@ import { Sparkles, Send, Layers } from 'lucide-react';
 import { Sheet } from './ui/Sheet';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { JulesSession } from '../services/julesApi';
+import { JulesSession, formatRepoDisplayName } from '../services/julesApi';
 import { useCreateJulesSessionMutation } from '../hooks/useJulesQueries';
 
 export interface NewTaskSheetProps {
@@ -127,7 +127,7 @@ export const NewTaskSheet: React.FC<NewTaskSheetProps> = ({
               >
                 {existingRepos.map((r) => (
                   <option key={r} value={r}>
-                    {r}
+                    {formatRepoDisplayName(r)} ({r})
                   </option>
                 ))}
               </select>

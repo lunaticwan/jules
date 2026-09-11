@@ -14,10 +14,6 @@ const OnboardingModal = lazy(() =>
 const NewTaskSheet = lazy(() =>
   import('./components/NewTaskSheet').then((module) => ({ default: module.NewTaskSheet }))
 );
-const KeyboardShortcutsModal = lazy(() =>
-  import('./components/KeyboardShortcutsModal').then((module) => ({ default: module.KeyboardShortcutsModal }))
-);
-
 export default function App() {
   const { data: userRepos = [] } = useUserRepositoriesQuery();
   const { data: sessions = [], isLoading, error: queryError, refetch } = useJulesSessionsQuery(userRepos);
@@ -27,7 +23,6 @@ export default function App() {
   const [selectedRepo, setSelectedRepo] = useState<string>('ALL');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState<boolean>(false);
-  const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
   const [isInitialOnboarding, setIsInitialOnboarding] = useState<boolean>(false);
 
   // 글로벌 API 에러 다이얼로그 상태
@@ -162,9 +157,9 @@ export default function App() {
   }, [sessions]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 relative overflow-x-hidden">
+    <div className="h-screen h-[100dvh] w-full bg-slate-950 text-slate-100 relative overflow-hidden flex flex-col">
       {/* PC 윈도우 및 갤럭시 폴드5 펴짐/대화면 (md 이상) Split View 레이아웃 */}
-      <div className="hidden md:flex h-screen overflow-hidden">
+      <div className="hidden md:flex h-full w-full overflow-hidden">
         {/* Left Side: Dashboard / Session List */}
         <div className="w-80 lg:w-96 border-r border-slate-800 flex flex-col h-full bg-slate-900 shrink-0">
           <DashboardView
@@ -176,7 +171,6 @@ export default function App() {
             onApprovePlan={handleApprovePlan}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onOpenNewTask={() => setIsNewTaskOpen(true)}
-            onOpenShortcuts={() => setIsShortcutsOpen(true)}
             onRefresh={() => refetch()}
             onSessionCreated={handleSessionCreated}
             isLoading={isLoading}
@@ -211,8 +205,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* 모바일 (갤럭시 폴드5 접힘 포함, md 미만) Single Column View */}
-      <div className="block md:hidden min-h-screen bg-slate-900 max-w-md mx-auto shadow-2xl">
+      {/* 모바일 (md 미만) Dynamic Viewport Height 기반 가득 차는 레이아웃 */}
+      <div className="block md:hidden h-full w-full bg-slate-900 overflow-hidden">
         {selectedSession ? (
           <ErrorBoundary onReset={() => handleSelectSession(null)}>
             <TaskDetailView
@@ -232,7 +226,6 @@ export default function App() {
               onApprovePlan={handleApprovePlan}
               onOpenSettings={() => setIsSettingsOpen(true)}
               onOpenNewTask={() => setIsNewTaskOpen(true)}
-              onOpenShortcuts={() => setIsShortcutsOpen(true)}
               onRefresh={() => refetch()}
               onSessionCreated={handleSessionCreated}
               isLoading={isLoading}
@@ -270,15 +263,6 @@ export default function App() {
         )}
       </Suspense>
 
-      {/* Lazy Loaded Keyboard Shortcuts Modal */}
-      <Suspense fallback={null}>
-        {isShortcutsOpen && (
-          <KeyboardShortcutsModal
-            isOpen={isShortcutsOpen}
-            onClose={() => setIsShortcutsOpen(false)}
-          />
-        )}
-      </Suspense>
 
       {/* Global API Error Dialog */}
       <ErrorDialog
