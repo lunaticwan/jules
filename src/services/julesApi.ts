@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import secureJsonParse from 'secure-json-parse';
 import { julesClient } from './apiClient';
 import { getLogTimestamp } from '../utils/logger';
 
@@ -56,6 +57,20 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
   const id = String(rawObj.id || rawObj.name?.split('/')?.pop() || fallbackId);
   const prompt = String(rawObj.prompt || rawObj.title || rawObj.userPrompt || '작업 요청 내용');
 
+  // PR URL / PR Number 파싱 (pullRequest 또는 prUrl 또는 outputs)
+  const prUrl =
+    rawObj.prUrl ||
+    rawObj.pullRequestUrl ||
+    rawObj.pullRequest?.htmlUrl ||
+    rawObj.outputs?.pullRequestUrl ||
+    rawObj.sourceContext?.source?.github?.url ||
+    rawObj.sourceContext?.source?.github?.htmlUrl;
+  const prNumber =
+    rawObj.prNumber ||
+    rawObj.pullRequestNumber ||
+    rawObj.pullRequest?.number ||
+    rawObj.outputs?.pullRequestNumber;
+
   // Jules API 응답 구조 및 일반 세션 데이터의 repository 필드 순차 검사
   let repo = String(
     rawObj.sourceContext?.source?.github?.repository ||
@@ -65,7 +80,34 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
       ''
   );
 
-  // 아무 정보도 없는 경우에만 폴백 적용
+  // repository 필드가 누락되었거나 'unknown/repository'인 경우 URL 후보군에서 owner/repo 정규식 추론
+  if (!repo || repo === 'unknown/repository' || !repo.includes('/')) {
+    const candidateUrls = [
+      prUrl,
+      rawObj.outputs?.pullRequestUrl,
+      rawObj.outputs?.url,
+      rawObj.pullRequest?.htmlUrl,
+      rawObj.sourceContext?.source?.github?.url,
+      rawObj.sourceContext?.source?.github?.htmlUrl,
+    ];
+
+    for (const urlCandidate of candidateUrls) {
+      if (typeof urlCandidate === 'string' && urlCandidate.length > 0) {
+        const match = urlCandidate.match(/github\.com\/([^\/\s]+)\/([^\/\s#\?]+)/);
+        if (match && match[1] && match[2]) {
+          const owner = match[1];
+          let repoName = match[2].replace(/\.git$/, '');
+          if (['pull', 'issues', 'tree', 'blob', 'releases'].includes(repoName)) {
+            continue;
+          }
+          repo = `${owner}/${repoName}`;
+          break;
+        }
+      }
+    }
+  }
+
+  // 여전히 아무 정보도 없는 경우에만 폴백 적용
   if (!repo || repo === 'unknown/repository') {
     repo = 'owner/repository';
   }
@@ -101,10 +143,6 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
       },
     ];
   }
-
-  // PR URL / PR Number 파싱 (pullRequest 또는 prUrl 또는 outputs)
-  const prUrl = rawObj.prUrl || rawObj.pullRequestUrl || rawObj.pullRequest?.htmlUrl || rawObj.outputs?.pullRequestUrl;
-  const prNumber = rawObj.prNumber || rawObj.pullRequestNumber || rawObj.pullRequest?.number || rawObj.outputs?.pullRequestNumber;
 
   const parsedSession: JulesSession = {
     id,
@@ -329,7 +367,7 @@ export function getStoredSessions(): JulesSession[] {
   try {
     const data = localStorage.getItem(STORAGE_KEYS.MOCK_SESSIONS);
     if (data) {
-      const parsed = JSON.parse(data);
+      const parsed = secureJsonParse.parse(data);
       if (Array.isArray(parsed) && parsed.length > 0) {
         list = parsed;
       }
