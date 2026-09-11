@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { julesClient } from './apiClient';
+import { getLogTimestamp } from '../utils/logger';
 
 /**
  * Zod 기반 Jules 메시지 객체 검증 스키마
@@ -50,7 +51,7 @@ export type JulesSession = z.infer<typeof JulesSessionSchema>;
  * 단일 세션 데이터 검증 및 보정 파서
  */
 export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'): JulesSession {
-  console.log('[safeParseJulesSession] [INPUT_RAW_DATA]', data);
+  console.log(`[${getLogTimestamp()}][safeParseJulesSession] [INPUT_RAW_DATA]`, data);
   const rawObj = typeof data === 'object' && data !== null ? (data as Record<string, any>) : {};
   const id = String(rawObj.id || rawObj.name?.split('/')?.pop() || fallbackId);
   const prompt = String(rawObj.prompt || rawObj.title || rawObj.userPrompt || '작업 요청 내용');
@@ -130,7 +131,7 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
     messages: parsedMessages,
   };
 
-  console.log('[safeParseJulesSession] [PARSED_RESULT]', parsedSession);
+  console.log(`[${getLogTimestamp()}][safeParseJulesSession] [PARSED_RESULT]`, parsedSession);
   return parsedSession;
 }
 
@@ -259,7 +260,7 @@ export function getJulesApiKey(): string {
   try {
     return localStorage.getItem(STORAGE_KEYS.JULES_KEY) || '';
   } catch (err) {
-    console.warn('LocalStorage 접근 실패 (Jules API Key):', err);
+    console.warn(`[${getLogTimestamp()}][JULES_KEY] LocalStorage 접근 실패:`, err);
     return '';
   }
 }
@@ -270,8 +271,9 @@ export function getJulesApiKey(): string {
 export function setJulesApiKey(key: string): void {
   try {
     localStorage.setItem(STORAGE_KEYS.JULES_KEY, key.trim());
+    console.log(`[${getLogTimestamp()}][JULES_KEY_SAVED] Jules API Key 저장 완료`);
   } catch (err) {
-    console.warn('LocalStorage 저장 실패 (Jules API Key):', err);
+    console.warn(`[${getLogTimestamp()}][JULES_KEY] LocalStorage 저장 실패:`, err);
   }
 }
 
@@ -281,8 +283,9 @@ export function setJulesApiKey(key: string): void {
 export function clearJulesApiKey(): void {
   try {
     localStorage.removeItem(STORAGE_KEYS.JULES_KEY);
+    console.log(`[${getLogTimestamp()}][JULES_KEY_CLEARED] Jules API Key 삭제 완료`);
   } catch (err) {
-    console.warn('LocalStorage 삭제 실패 (Jules API Key):', err);
+    console.warn(`[${getLogTimestamp()}][JULES_KEY] LocalStorage 삭제 실패:`, err);
   }
 }
 
@@ -291,6 +294,7 @@ export function clearJulesApiKey(): void {
  */
 export async function verifyJulesKey(keyInput?: string): Promise<{ success: boolean; message: string }> {
   const apiKey = keyInput !== undefined ? keyInput.trim() : getJulesApiKey();
+  console.log(`[${getLogTimestamp()}][verifyJulesKey] [START] keyLength: ${apiKey.length}`);
   if (!apiKey) {
     return { success: false, message: 'Jules API 키가 입력되지 않았음 (로컬/Mock 모드로 정상 동작)' };
   }
@@ -300,15 +304,18 @@ export async function verifyJulesKey(keyInput?: string): Promise<{ success: bool
       params: { key: apiKey },
     });
     if (res.status === 200) {
+      console.log(`[${getLogTimestamp()}][verifyJulesKey] [SUCCESS] status: ${res.status}`);
       return { success: true, message: 'Jules API 연결 검증 성공' };
     }
+    console.warn(`[${getLogTimestamp()}][verifyJulesKey] [UNEXPECTED_STATUS] status: ${res.status}`);
     return { success: false, message: `Jules API 응답 상태 이상 (${res.status})` };
   } catch (err: any) {
     const status = err?.response?.status;
-    if (status === 401 || status === 403) {
-      return { success: false, message: '유효하지 않거나 권한이 없는 Jules API 키임 (로컬 폴백 적용)' };
-    }
-    return { success: false, message: `Jules API 검증 실패: ${err?.message || 'CORS/네트워크 오류 (로컬 폴백 활성화)'}` };
+    const msg = status === 401 || status === 403
+      ? '유효하지 않거나 권한이 없는 Jules API 키임 (로컬 폴백 적용)'
+      : `Jules API 검증 실패: ${err?.message || 'CORS/네트워크 오류 (로컬 폴백 활성화)'}`;
+    console.warn(`[${getLogTimestamp()}][verifyJulesKey] [FAILED]`, msg, err);
+    return { success: false, message: msg };
   }
 }
 
@@ -328,7 +335,7 @@ export function getStoredSessions(): JulesSession[] {
       }
     }
   } catch (err) {
-    console.warn('LocalStorage 세션 파싱 실패, 인메모리 반환:', err);
+    console.warn(`[${getLogTimestamp()}][getStoredSessions] LocalStorage 파싱 실패, 인메모리 반환:`, err);
   }
 
   if (list.length === 0) {
@@ -340,11 +347,8 @@ export function getStoredSessions(): JulesSession[] {
   } else {
     inMemorySessionsCache = list;
   }
-  // inMemoryCache 참상태 유지
-  if (inMemorySessionsCache) {
-    // cached
-  }
 
+  console.log(`[${getLogTimestamp()}][getStoredSessions] [COUNT: ${list.length}] cacheExists: ${!!inMemorySessionsCache}`);
   return list.map((s, index) => safeParseJulesSession(s, `sess-${index + 101}`));
 }
 
@@ -353,10 +357,11 @@ export function getStoredSessions(): JulesSession[] {
  */
 export function saveStoredSessions(sessions: JulesSession[]): void {
   inMemorySessionsCache = sessions;
+  console.log(`[${getLogTimestamp()}][saveStoredSessions] [SAVING_COUNT: ${sessions.length}]`, sessions);
   try {
     localStorage.setItem(STORAGE_KEYS.MOCK_SESSIONS, JSON.stringify(sessions));
   } catch (err) {
-    console.warn('LocalStorage 저장 실패 (In-Memory 캐시 사용):', err);
+    console.warn(`[${getLogTimestamp()}][saveStoredSessions] LocalStorage 저장 실패 (In-Memory 캐시 사용):`, err);
   }
 }
 
@@ -365,30 +370,30 @@ export function saveStoredSessions(sessions: JulesSession[]): void {
  */
 export async function fetchJulesSessions(): Promise<JulesSession[]> {
   const apiKey = getJulesApiKey();
-  console.log('[fetchJulesSessions] [API_KEY_PRESENT]', !!apiKey);
+  console.log(`[${getLogTimestamp()}][fetchJulesSessions] [START] apiKeyPresent: ${!!apiKey}`);
   if (!apiKey) {
     const stored = getStoredSessions();
-    console.log('[fetchJulesSessions] [NO_KEY_FALLBACK_STORED]', stored);
+    console.log(`[${getLogTimestamp()}][fetchJulesSessions] [NO_KEY_FALLBACK]`, stored);
     return stored;
   }
 
   try {
-    console.log('[fetchJulesSessions] [SENDING_REQUEST] GET /sessions');
+    console.log(`[${getLogTimestamp()}][fetchJulesSessions] [SEND_REQ] GET /sessions`);
     const response = await julesClient.get('/sessions');
-    console.log('[fetchJulesSessions] [HTTP_RESPONSE_SUCCESS]', response.status, response.data);
+    console.log(`[${getLogTimestamp()}][fetchJulesSessions] [HTTP_SUCCESS] status: ${response.status}`);
     const data = response.data;
     if (Array.isArray(data.sessions)) {
       const mapped = data.sessions.map((s: any, index: number) => safeParseJulesSession(s, `session-${index}`));
-      console.log('[fetchJulesSessions] [MAPPED_SESSIONS]', mapped);
+      console.log(`[${getLogTimestamp()}][fetchJulesSessions] [MAPPED_SESSIONS_COUNT: ${mapped.length}]`, mapped);
       saveStoredSessions(mapped);
       return mapped;
     }
   } catch (err: any) {
-    console.error('[fetchJulesSessions] [API_ERROR]', err?.response?.status, err?.message, err?.response?.data || err);
+    console.error(`[${getLogTimestamp()}][fetchJulesSessions] [API_ERROR]`, err?.response?.status, err?.message, err?.response?.data || err);
   }
 
   const fallback = getStoredSessions();
-  console.log('[fetchJulesSessions] [FALLBACK_STORED_SESSIONS]', fallback);
+  console.log(`[${getLogTimestamp()}][fetchJulesSessions] [FALLBACK_STORED_SESSIONS]`, fallback);
   return fallback;
 }
 
@@ -397,23 +402,23 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
  */
 export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesSession | null> {
   const apiKey = getJulesApiKey();
-  console.log('[fetchJulesSessionDetail] [SESSION_ID]', sessionId, '[API_KEY_PRESENT]', !!apiKey);
+  console.log(`[${getLogTimestamp()}][fetchJulesSessionDetail] [START] sessionId: ${sessionId}, apiKeyPresent: ${!!apiKey}`);
   if (apiKey) {
     try {
-      console.log(`[fetchJulesSessionDetail] [SENDING_REQUEST] GET /${sessionId}`);
+      console.log(`[${getLogTimestamp()}][fetchJulesSessionDetail] [SEND_REQ] GET /${sessionId}`);
       const response = await julesClient.get(`/${sessionId}`);
-      console.log('[fetchJulesSessionDetail] [HTTP_RESPONSE_SUCCESS]', response.status, response.data);
+      console.log(`[${getLogTimestamp()}][fetchJulesSessionDetail] [HTTP_SUCCESS] status: ${response.status}`);
       if (response.data) {
         return safeParseJulesSession(response.data, sessionId);
       }
     } catch (err: any) {
-      console.error('[fetchJulesSessionDetail] [API_ERROR]', err?.response?.status, err?.message, err?.response?.data || err);
+      console.error(`[${getLogTimestamp()}][fetchJulesSessionDetail] [API_ERROR]`, err?.response?.status, err?.message, err?.response?.data || err);
     }
   }
 
   const sessions = getStoredSessions();
   const found = sessions.find((s) => s.id === sessionId || s.name === sessionId);
-  console.log('[fetchJulesSessionDetail] [LOCAL_FOUND]', found);
+  console.log(`[${getLogTimestamp()}][fetchJulesSessionDetail] [LOCAL_FOUND]`, found);
   return found || null;
 }
 
@@ -426,6 +431,7 @@ export async function createJulesSession(params: {
   prompt: string;
 }): Promise<JulesSession> {
   const apiKey = getJulesApiKey();
+  console.log(`[${getLogTimestamp()}][createJulesSession] [START]`, params);
   const newId = `sess-${Date.now().toString().slice(-5)}`;
   const newSession: JulesSession = {
     id: newId,
@@ -461,6 +467,7 @@ export async function createJulesSession(params: {
 
   if (apiKey) {
     try {
+      console.log(`[${getLogTimestamp()}][createJulesSession] [SEND_REQ] POST /sessions`, params);
       const response = await julesClient.post('/sessions', {
         repository: params.repository,
         baseBranch: params.baseBranch,
@@ -470,16 +477,18 @@ export async function createJulesSession(params: {
         const combined = { ...newSession, ...response.data };
         const current = getStoredSessions();
         saveStoredSessions([combined, ...current]);
+        console.log(`[${getLogTimestamp()}][createJulesSession] [API_SUCCESS]`, combined);
         return combined;
       }
     } catch (err) {
-      console.warn('Jules 생성 API 실패, 로컬 생성으로 진행:', err);
+      console.warn(`[${getLogTimestamp()}][createJulesSession] Jules 생성 API 실패, 로컬 생성으로 진행:`, err);
     }
   }
 
   const current = getStoredSessions();
   const updated = [newSession, ...current];
   saveStoredSessions(updated);
+  console.log(`[${getLogTimestamp()}][createJulesSession] [LOCAL_CREATED]`, newSession);
   return newSession;
 }
 
@@ -487,6 +496,7 @@ export async function createJulesSession(params: {
  * Jules 작업 세션의 검토 대기 플랜을 승인함
  */
 export async function approveJulesPlan(sessionId: string): Promise<JulesSession> {
+  console.log(`[${getLogTimestamp()}][approveJulesPlan] [START] sessionId: ${sessionId}`);
   const sessions = getStoredSessions();
   const idx = sessions.findIndex((s) => s.id === sessionId || s.name === sessionId);
   if (idx !== -1) {
@@ -507,8 +517,10 @@ export async function approveJulesPlan(sessionId: string): Promise<JulesSession>
       type: 'thought',
     });
     saveStoredSessions(sessions);
+    console.log(`[${getLogTimestamp()}][approveJulesPlan] [APPROVED_SUCCESS]`, sessions[idx]);
     return sessions[idx];
   }
+  console.error(`[${getLogTimestamp()}][approveJulesPlan] [NOT_FOUND] sessionId: ${sessionId}`);
   throw new Error('세션을 찾을 수 없음');
 }
 
@@ -519,6 +531,7 @@ export async function triggerQuickAiAction(
   repo: string,
   actionType: 'lint' | 'security' | 'perf' | 'test'
 ): Promise<JulesSession> {
+  console.log(`[${getLogTimestamp()}][triggerQuickAiAction] [START] repo: ${repo}, actionType: ${actionType}`);
   const promptMap = {
     lint: '전체 코드베이스 ESLint/TypeScript 타입 체크 규칙 정형화 및 경고 수정을 위한 리팩토링 진행',
     security: '의존성 패키지 취약점 점검 및 보안 강화 업데이트 적용',
@@ -537,6 +550,7 @@ export async function triggerQuickAiAction(
  * 진행 중인 Jules 세션에 추가 피드백 메시지를 전송함
  */
 export async function sendJulesMessage(sessionId: string, message: string): Promise<JulesSession> {
+  console.log(`[${getLogTimestamp()}][sendJulesMessage] [START] sessionId: ${sessionId}, message: ${message}`);
   const sessions = getStoredSessions();
   const idx = sessions.findIndex((s) => s.id === sessionId || s.name === sessionId);
   if (idx !== -1) {
@@ -556,7 +570,9 @@ export async function sendJulesMessage(sessionId: string, message: string): Prom
       type: 'thought',
     });
     saveStoredSessions(sessions);
+    console.log(`[${getLogTimestamp()}][sendJulesMessage] [SENT_SUCCESS]`, sessions[idx]);
     return sessions[idx];
   }
+  console.error(`[${getLogTimestamp()}][sendJulesMessage] [NOT_FOUND] sessionId: ${sessionId}`);
   throw new Error('세션을 찾을 수 없음');
 }

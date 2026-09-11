@@ -1,4 +1,5 @@
 import { Octokit } from 'octokit';
+import { getLogTimestamp } from '../utils/logger';
 
 /**
  * GitHub Pull Request 상세 상태 객체
@@ -47,51 +48,6 @@ export function getRepoLinks(repository: string): RepoLinks {
   };
 }
 
-/**
- * 특정 PR의 변경 파일(files) 목록을 GitHub Octokit REST API로 조회함
- */
-export async function fetchPRFiles(
-  repo: string,
-  prNumber: number
-): Promise<{ filepath: string; status: 'added' | 'modified' | 'deleted'; additions: number; deletions: number; patch?: string }[]> {
-  console.log('[fetchPRFiles] [INPUT]', { repo, prNumber });
-  const parts = repo.split('/');
-  const owner = parts[0];
-  const repoName = parts[1] || parts[0];
-
-  if (!owner || !repoName || !prNumber) {
-    console.warn('[fetchPRFiles] [INVALID_PARAMS]', { owner, repoName, prNumber });
-    return [];
-  }
-
-  try {
-    const octokit = getOctokitClient();
-    console.log('[fetchPRFiles] [OCTOKIT_REQUEST]', { owner, repo: repoName, pull_number: prNumber });
-    const response = await octokit.rest.pulls.listFiles({
-      owner,
-      repo: repoName,
-      pull_number: prNumber,
-      per_page: 100,
-    });
-
-    console.log('[fetchPRFiles] [OCTOKIT_RESPONSE_COUNT]', response.data?.length);
-    if (Array.isArray(response.data)) {
-      const mapped = response.data.map((f: any) => ({
-        filepath: f.filename,
-        status: (['added', 'deleted', 'modified'].includes(f.status) ? f.status : 'modified') as 'added' | 'modified' | 'deleted',
-        additions: f.additions || 0,
-        deletions: f.deletions || 0,
-        patch: f.patch,
-      }));
-      console.log('[fetchPRFiles] [MAPPED_FILES]', mapped);
-      return mapped;
-    }
-  } catch (err: any) {
-    console.error('[fetchPRFiles] [ERROR]', err?.status, err?.message, err);
-  }
-  return [];
-}
-
 const GITHUB_TOKEN_KEY = 'github_pat' as const;
 
 /**
@@ -101,7 +57,7 @@ export function getGitHubToken(): string {
   try {
     return localStorage.getItem(GITHUB_TOKEN_KEY) || '';
   } catch (err) {
-    console.warn('LocalStorage 접근 실패 (GitHub PAT):', err);
+    console.warn(`[${getLogTimestamp()}][GITHUB_TOKEN] LocalStorage 접근 실패:`, err);
     return '';
   }
 }
@@ -112,8 +68,9 @@ export function getGitHubToken(): string {
 export function setGitHubToken(token: string): void {
   try {
     localStorage.setItem(GITHUB_TOKEN_KEY, token.trim());
+    console.log(`[${getLogTimestamp()}][GITHUB_TOKEN_SAVED] GitHub PAT 저장 완료`);
   } catch (err) {
-    console.warn('LocalStorage 저장 실패 (GitHub PAT):', err);
+    console.warn(`[${getLogTimestamp()}][GITHUB_TOKEN] LocalStorage 저장 실패:`, err);
   }
 }
 
@@ -123,19 +80,84 @@ export function setGitHubToken(token: string): void {
 export function clearGitHubToken(): void {
   try {
     localStorage.removeItem(GITHUB_TOKEN_KEY);
+    console.log(`[${getLogTimestamp()}][GITHUB_TOKEN_CLEARED] GitHub PAT 삭제 완료`);
   } catch (err) {
-    console.warn('LocalStorage 삭제 실패 (GitHub PAT):', err);
+    console.warn(`[${getLogTimestamp()}][GITHUB_TOKEN] LocalStorage 삭제 실패:`, err);
   }
 }
 
 /**
- * Octokit REST SDK 인스턴스를 생성하여 반환함
+ * Octokit REST SDK 인스턴스를 생성하여 반환함 (자동 로깅 훅 내장)
  */
 export function getOctokitClient(overrideToken?: string): Octokit {
   const token = overrideToken !== undefined ? overrideToken : getGitHubToken();
-  return new Octokit({
+  const octokit = new Octokit({
     auth: token || undefined,
   });
+
+  octokit.hook.wrap('request', async (request, options) => {
+    const timestamp = getLogTimestamp();
+    console.log(`[${timestamp}][API_REQ] [GitHub-Octokit] ${options.method} ${options.url}`, options);
+    try {
+      const response = await request(options);
+      console.log(`[${timestamp}][API_RES] [GitHub-Octokit] ${response.status} ${options.method} ${options.url}`, {
+        data: response.data,
+        headers: response.headers,
+      });
+      return response;
+    } catch (error: any) {
+      console.error(`[${timestamp}][API_ERR] [GitHub-Octokit] ${error?.status || 'ERR'} ${options.method} ${options.url}`, {
+        message: error?.message,
+        error,
+      });
+      throw error;
+    }
+  });
+
+  return octokit;
+}
+
+/**
+ * 특정 PR의 변경 파일(files) 목록을 GitHub Octokit REST API로 조회함
+ */
+export async function fetchPRFiles(
+  repo: string,
+  prNumber: number
+): Promise<{ filepath: string; status: 'added' | 'modified' | 'deleted'; additions: number; deletions: number; patch?: string }[]> {
+  console.log(`[${getLogTimestamp()}][fetchPRFiles] [START]`, { repo, prNumber });
+  const parts = repo.split('/');
+  const owner = parts[0];
+  const repoName = parts[1] || parts[0];
+
+  if (!owner || !repoName || !prNumber) {
+    console.warn(`[${getLogTimestamp()}][fetchPRFiles] [INVALID_PARAMS]`, { owner, repoName, prNumber });
+    return [];
+  }
+
+  try {
+    const octokit = getOctokitClient();
+    const response = await octokit.rest.pulls.listFiles({
+      owner,
+      repo: repoName,
+      pull_number: prNumber,
+      per_page: 100,
+    });
+
+    if (Array.isArray(response.data)) {
+      const mapped = response.data.map((f: any) => ({
+        filepath: f.filename,
+        status: (['added', 'deleted', 'modified'].includes(f.status) ? f.status : 'modified') as 'added' | 'modified' | 'deleted',
+        additions: f.additions || 0,
+        deletions: f.deletions || 0,
+        patch: f.patch,
+      }));
+      console.log(`[${getLogTimestamp()}][fetchPRFiles] [RESULT_COUNT: ${mapped.length}]`, mapped);
+      return mapped;
+    }
+  } catch (err: any) {
+    console.error(`[${getLogTimestamp()}][fetchPRFiles] [ERROR]`, err?.status, err?.message, err);
+  }
+  return [];
 }
 
 /**
@@ -145,6 +167,7 @@ export async function verifyGitHubToken(
   tokenInput?: string
 ): Promise<{ success: boolean; username?: string; message: string }> {
   const token = tokenInput !== undefined ? tokenInput.trim() : getGitHubToken();
+  console.log(`[${getLogTimestamp()}][verifyGitHubToken] [START] tokenLength: ${token.length}`);
   if (!token) {
     return { success: false, message: 'GitHub 토큰이 입력되지 않았음' };
   }
@@ -152,17 +175,18 @@ export async function verifyGitHubToken(
   try {
     const octokit = getOctokitClient(token);
     const userRes = await octokit.rest.users.getAuthenticated();
-    return {
+    const result = {
       success: true,
       username: userRes.data.login,
       message: `GitHub 인증 성공 (계정: ${userRes.data.login})`,
     };
+    console.log(`[${getLogTimestamp()}][verifyGitHubToken] [SUCCESS]`, result);
+    return result;
   } catch (err: any) {
     const status = err?.status || err?.response?.status;
-    if (status === 401) {
-      return { success: false, message: '유효하지 않거나 만료된 GitHub 토큰임' };
-    }
-    return { success: false, message: `GitHub 토큰 검증 실패: ${err?.message || '알 수 없는 오류'}` };
+    const msg = status === 401 ? '유효하지 않거나 만료된 GitHub 토큰임' : `GitHub 토큰 검증 실패: ${err?.message || '알 수 없는 오류'}`;
+    console.warn(`[${getLogTimestamp()}][verifyGitHubToken] [FAILED]`, msg, err);
+    return { success: false, message: msg };
   }
 }
 
@@ -181,10 +205,12 @@ export async function fetchUserRepositories(): Promise<string[]> {
     });
 
     if (Array.isArray(response.data)) {
-      return response.data.map((r) => r.full_name);
+      const repos = response.data.map((r) => r.full_name);
+      console.log(`[${getLogTimestamp()}][fetchUserRepositories] [SUCCESS_COUNT: ${repos.length}]`, repos);
+      return repos;
     }
   } catch (err) {
-    console.warn('GitHub 레포지토리 목록 수신 실패 (Octokit):', err);
+    console.warn(`[${getLogTimestamp()}][fetchUserRepositories] [ERROR]`, err);
   }
   return [];
 }
@@ -208,7 +234,7 @@ export async function fetchGitHubPR(repo: string, prNumber: number): Promise<Git
     });
 
     const data = response.data;
-    return {
+    const details: GitHubPRDetails = {
       number: data.number,
       title: data.title,
       state: data.state as 'open' | 'closed',
@@ -218,8 +244,10 @@ export async function fetchGitHubPR(repo: string, prNumber: number): Promise<Git
       baseBranch: data.base?.ref || '',
       updatedAt: data.updated_at,
     };
+    console.log(`[${getLogTimestamp()}][fetchGitHubPR] [SUCCESS]`, details);
+    return details;
   } catch (err) {
-    console.warn('GitHub PR fetch failed (Octokit):', err);
+    console.warn(`[${getLogTimestamp()}][fetchGitHubPR] [ERROR]`, err);
     return null;
   }
 }
@@ -254,16 +282,18 @@ export async function fetchRepoDeploymentStatus(repo: string): Promise<RepoDeplo
 
       if (response.data) {
         const pagesData = response.data as any;
-        return {
+        const result: RepoDeploymentHealth = {
           repo,
           pagesDeployed: true,
           deploymentUrl: pagesData.html_url || links.pagesUrl,
           lastDeployedAt: pagesData.updated_at || new Date().toISOString(),
           checkStatus: 'success',
         };
+        console.log(`[${getLogTimestamp()}][fetchRepoDeploymentStatus] [SUCCESS]`, result);
+        return result;
       }
     } catch (err) {
-      console.warn('GitHub Pages status fetch error (Octokit):', err);
+      console.warn(`[${getLogTimestamp()}][fetchRepoDeploymentStatus] [PAGES_FETCH_ERROR]`, err);
     }
   }
 
@@ -305,7 +335,8 @@ export async function fetchCheckRuns(repo: string, ref: string): Promise<'succes
     if (allCompletedSuccess) return 'success';
 
     return 'pending';
-  } catch {
+  } catch (err) {
+    console.warn(`[${getLogTimestamp()}][fetchCheckRuns] [ERROR]`, err);
     return 'pending';
   }
 }
