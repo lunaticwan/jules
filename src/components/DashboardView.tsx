@@ -329,8 +329,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <table className="w-full text-left border-collapse bg-white dark:bg-slate-900/80 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800">
             <thead>
               <tr className="bg-slate-100/80 dark:bg-slate-800/80 text-xs font-mono text-slate-600 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                <th className="py-1.5 px-2 font-bold w-1/4">저장소 (Repo)</th>
-                <th className="py-1.5 px-2 font-bold">태스크 요약</th>
+                <th className="py-1.5 px-2 font-bold">저장소 (Repo)</th>
                 <th className="py-1.5 px-1.5 font-bold text-center shrink-0">상태</th>
                 <th className="py-1.5 px-1.5 font-bold text-center shrink-0">PR 생성 여부</th>
                 <th className="py-1.5 px-1.5 font-bold text-right shrink-0">업데이트</th>
