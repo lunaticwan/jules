@@ -10,7 +10,7 @@ import { Input } from './ui/Input';
 import { ScrollArea } from './ui/ScrollArea';
 import { Toast } from './ui/Toast';
 import { ChangedFilesView } from './ChangedFilesView';
-import { JulesSession } from '../services/julesApi';
+import { JulesSession, formatRepoDisplayName } from '../services/julesApi';
 import { getRepoLinks } from '../services/githubApi';
 import { useApproveJulesPlanMutation, useSendJulesMessageMutation, useJulesSessionDetailQuery } from '../hooks/useJulesQueries';
 
@@ -127,7 +127,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors relative">
+    <div className="flex flex-col h-full w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors relative overflow-hidden">
       {(isDetailLoading || isSubmitting) && (
         <div className="w-full bg-blue-100 dark:bg-blue-950 h-1 overflow-hidden sticky top-0 z-30">
           <div className="bg-blue-600 h-full animate-pulse w-full" />
@@ -147,7 +147,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
           <button
             onClick={onBack}
             className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0"
-            title="목록으로 돌아가기 (ESC)"
+            title="목록으로 돌아가기"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             <span>닫기</span>
@@ -155,7 +155,7 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/90 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-900/70 text-xs shrink-0 break-all">
-                {session.repository}
+                {formatRepoDisplayName(session.repository)}
               </span>
               <span className="text-xs font-mono text-slate-500 dark:text-slate-400 shrink-0">
                 ({session.baseBranch || 'main'})

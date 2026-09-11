@@ -1,9 +1,8 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Settings, Plus, RefreshCw, Terminal, Clock, AlertCircle, CheckCircle2, Search, Moon, Sun, Filter, GitBranch, Globe, ArrowUpDown, Command } from 'lucide-react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { Settings, Plus, RefreshCw, Terminal, Clock, AlertCircle, CheckCircle2, Search, Moon, Sun, Filter, GitBranch, Globe, ArrowUpDown } from 'lucide-react';
 import { SessionCard } from './SessionCard';
-import { JulesSession } from '../services/julesApi';
+import { JulesSession, formatRepoDisplayName } from '../services/julesApi';
 import { getGitHubToken, getRepoLinks } from '../services/githubApi';
-import { useUserRepositoriesQuery } from '../hooks/useGitHubQueries';
 import { useTheme } from '../context/ThemeContext';
 
 /**
@@ -28,8 +27,6 @@ export interface DashboardViewProps {
   onOpenNewTask: () => void;
   /** 데이터 새로고침 핸들러 */
   onRefresh: () => void;
-  /** 키보드 단축키 모달 오픈 핸들러 */
-  onOpenShortcuts?: () => void;
   /** 세션 생성 완료 후 콜백 */
   onSessionCreated?: (session: JulesSession) => void;
   /** 데이터 로딩 상태 */
@@ -51,7 +48,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenSettings,
   onOpenNewTask,
   onRefresh,
-  onOpenShortcuts,
   isLoading,
 }) => {
   const { theme, toggleTheme } = useTheme();
@@ -62,48 +58,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const githubToken = getGitHubToken();
-  const { data: userRepos = [] } = useUserRepositoriesQuery();
 
   /**
-   * 글로벌 키보드 단축키 핸들러 등록
-   */
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-        return;
-      }
-
-      if (e.key === '/') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      } else if (e.key.toLowerCase() === 'n') {
-        e.preventDefault();
-        onOpenNewTask();
-      } else if (e.key.toLowerCase() === 'r') {
-        e.preventDefault();
-        onRefresh();
-      } else if (e.key === '?' && e.shiftKey) {
-        e.preventDefault();
-        if (onOpenShortcuts) onOpenShortcuts();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onOpenNewTask, onRefresh, onOpenShortcuts]);
-
-  /**
-   * 세션 데이터 및 GitHub API 기반 사용 가능 저장소 목록 계산
+   * Jules 작업 세션에 연결되어 있거나 이력이 있는 저장소 목록 추출
    */
   const allRepos = useMemo(() => {
     return Array.from(
-      new Set([
-        ...sessions.map((s) => s.repository).filter(Boolean),
-        ...userRepos,
-      ])
+      new Set(sessions.map((s) => s.repository).filter(Boolean))
     );
-  }, [sessions, userRepos]);
+  }, [sessions]);
 
   /**
    * 상태별 세션 수 카운트 계산
@@ -153,7 +116,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [onRepoSelect]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-20 transition-colors">
+    <div className="flex flex-col h-full w-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors overflow-hidden relative">
       {/* Loading Progress Bar */}
       {isLoading && (
         <div className="w-full bg-blue-100 dark:bg-blue-950 h-1 overflow-hidden sticky top-0 z-30">
@@ -185,15 +148,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
-          {onOpenShortcuts && (
-            <button
-              onClick={onOpenShortcuts}
-              className="rounded-lg p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-              title="키보드 단축키 (Shift + ?)"
-            >
-              <Command className="h-4 w-4 text-blue-500" />
-            </button>
-          )}
           <button
             onClick={toggleTheme}
             className="rounded-lg p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
@@ -204,7 +158,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             onClick={onRefresh}
             className="rounded-lg p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200 active:rotate-180 transition-transform"
-            title="새로고침 (R)"
+            title="새로고침"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
@@ -232,7 +186,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 const count = sessions.filter((s) => s.repository === repo).length;
                 return (
                   <option key={repo} value={repo}>
-                    {repo} {count > 0 ? `(${count})` : ''}
+                    {formatRepoDisplayName(repo)} {count > 0 ? `(${count})` : ''}
                   </option>
                 );
               })}
@@ -245,22 +199,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="태스크/레포 검색 (단축키 '/') ..."
+              placeholder="태스크/레포 검색..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 pl-7 pr-7 py-1 text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
-            {searchQuery ? (
+            {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
                 className="absolute right-2 top-1 text-xs text-slate-400 hover:text-slate-200"
               >
                 ✕
               </button>
-            ) : (
-              <kbd className="absolute right-2 top-1 text-xs font-mono font-bold text-slate-400 bg-slate-200 dark:bg-slate-700 px-1 rounded pointer-events-none">
-                /
-              </kbd>
             )}
           </div>
 
@@ -281,7 +231,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {selectedRepo !== 'ALL' && (
           <div className="flex items-center justify-between text-xs bg-blue-50/60 dark:bg-blue-950/40 px-2 py-1 rounded-md border border-blue-200/80 dark:border-blue-900/50">
             <span className="font-bold text-blue-700 dark:text-blue-300 font-mono text-xs break-all">
-              {selectedRepo}
+              {formatRepoDisplayName(selectedRepo)}
             </span>
             <div className="flex items-center gap-1.5 text-xs shrink-0 ml-2">
               <a
@@ -357,7 +307,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      <div className="p-1 overflow-x-auto relative">
+      <div className="flex-1 overflow-auto p-1 relative safe-pb">
         {isLoading && sessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-2">
             <RefreshCw className="h-6 w-6 animate-spin text-blue-500" />
@@ -405,7 +355,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <button
         onClick={onOpenNewTask}
         className="fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-500 active:scale-95 transition-all"
-        title="새 태스크 작성 (N)"
+        title="새 태스크 작성"
       >
         <Plus className="h-6 w-6" />
       </button>

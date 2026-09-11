@@ -48,6 +48,17 @@ export type JulesMessage = z.infer<typeof JulesMessageSchema>;
 export type JulesPlanStep = z.infer<typeof JulesPlanStepSchema>;
 export type JulesSession = z.infer<typeof JulesSessionSchema>;
 
+/**
+ * owner/repo 문자열에서 owner(계정명)를 지우고 레포명만 추출하여 반환함
+ * 예: 'lunaticwan/stackedit' -> 'stackedit', '(저장소 정보 미수신)' -> '(저장소 정보 미수신)'
+ */
+export function formatRepoDisplayName(repo?: string): string {
+  if (!repo) return '';
+  if (repo.startsWith('(') && repo.endsWith(')')) return repo;
+  const parts = repo.split('/');
+  return parts.length > 1 ? parts[parts.length - 1] : repo;
+}
+
 /** 기술 용어 및 오추론 방지 비-저장소 단어 블랙리스트 */
 const NON_REPO_TERMS = new Set([
   'ui/ux', 'ci/cd', 'i/o', 'a/b', 'tcp/ip', 'http/1', 'http/2',

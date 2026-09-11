@@ -4,7 +4,7 @@ import { ko } from 'date-fns/locale';
 import { ExternalLink, CheckCircle2, Clock, AlertCircle, ArrowRight, GitPullRequest } from 'lucide-react';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
-import { JulesSession } from '../services/julesApi';
+import { JulesSession, formatRepoDisplayName } from '../services/julesApi';
 
 /**
  * 대시보드 테이블 단일 세션 행(Row) 컴포넌트 프롭스
@@ -84,7 +84,7 @@ export const SessionCard: React.FC<SessionCardProps> = React.memo(({
       }`}
     >
       <td className="py-2 px-2 font-bold text-blue-700 dark:text-blue-300 break-all leading-tight align-top">
-        {session.repository}
+        {formatRepoDisplayName(session.repository)}
       </td>
       <td className="py-2 px-2 text-slate-900 dark:text-slate-100 font-sans font-medium leading-relaxed whitespace-normal break-words align-top">
         {session.title || session.prompt}
