@@ -1,8 +1,13 @@
+/// <reference types="vitest" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 // Vite 및 PWA 플러그인 설정
 export default defineConfig({
+    test: {
+        globals: true,
+        environment: 'jsdom',
+    },
     base: './',
     build: {
         chunkSizeWarningLimit: 600,
