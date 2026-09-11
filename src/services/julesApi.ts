@@ -48,6 +48,15 @@ export type JulesMessage = z.infer<typeof JulesMessageSchema>;
 export type JulesPlanStep = z.infer<typeof JulesPlanStepSchema>;
 export type JulesSession = z.infer<typeof JulesSessionSchema>;
 
+/** 기술 용어 및 오추론 방지 비-저장소 단어 블랙리스트 */
+const NON_REPO_TERMS = new Set([
+  'ui/ux', 'ci/cd', 'i/o', 'a/b', 'tcp/ip', 'http/1', 'http/2',
+  'client/server', 'v1/alpha', 'v1alpha', 'v1/beta', 'api/v1', 'api/v2'
+]);
+const INVALID_OWNER_NAMES = new Set([
+  'ui', 'ci', 'i', 'a', 'sessions', 'pull', 'issues', 'tree', 'blob', 'releases', 'api', 'v1', 'v1alpha', 'v1beta'
+]);
+
 /**
  * 단일 세션 데이터 검증 및 보정 파서
  */
@@ -131,16 +140,29 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
     if (!repo || repo === 'owner/repository' || repo === 'unknown/repository') {
       const textRepoMatch = fullTextContext.match(/([a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+)/);
       if (textRepoMatch && textRepoMatch[1] && textRepoMatch[1].includes('/') && !textRepoMatch[1].startsWith('http')) {
-        const [o, r] = textRepoMatch[1].split('/');
-        if (o && r && !['sessions', 'pull', 'issues'].includes(o)) {
+        const candidateStr = textRepoMatch[1];
+        const [o, r] = candidateStr.split('/');
+        if (
+          o &&
+          r &&
+          !NON_REPO_TERMS.has(candidateStr.toLowerCase()) &&
+          !INVALID_OWNER_NAMES.has(o.toLowerCase())
+        ) {
           repo = `${o}/${r.replace(/\.git$/, '')}`;
         }
       }
     }
   }
 
-  // 여전히 누락되었거나 기본 템플릿 스트링인 경우 정보를 가져오지 못했음을 명확히 표시
-  if (!repo || repo === 'owner/repository' || repo === 'unknown/repository' || !repo.includes('/')) {
+  // 여전히 누락되었거나 기술용어 오추론/기본 템플릿 스트링인 경우 정보 미수신으로 명확히 표시
+  if (
+    !repo ||
+    repo === 'owner/repository' ||
+    repo === 'unknown/repository' ||
+    !repo.includes('/') ||
+    NON_REPO_TERMS.has(repo.toLowerCase()) ||
+    INVALID_OWNER_NAMES.has(repo.split('/')[0].toLowerCase())
+  ) {
     repo = '(저장소 정보 미수신)';
   }
 
