@@ -22,10 +22,13 @@ julesClient.interceptors.request.use((config) => {
     };
   }
 
+  (config as any).meta = { requestStartTime: Date.now() };
   const method = (config.method || 'GET').toUpperCase();
   const fullUrl = `${config.baseURL || ''}${config.url || ''}`;
   console.log(`[${getLogTimestamp()}][API_REQ] [Jules] ${method} ${fullUrl}`, {
-    params: config.params,
+    url: fullUrl,
+    method,
+    params: config.params ? { ...config.params, key: config.params.key ? '[MASKED]' : undefined } : {},
     headers: config.headers,
     data: config.data,
   });
@@ -38,7 +41,14 @@ julesClient.interceptors.response.use(
   (response) => {
     const method = (response.config.method || 'GET').toUpperCase();
     const fullUrl = `${response.config.baseURL || ''}${response.config.url || ''}`;
-    console.log(`[${getLogTimestamp()}][API_RES] [Jules] ${response.status} ${response.statusText} ${method} ${fullUrl}`, {
+    const startTime = (response.config as any).meta?.requestStartTime;
+    const durationMs = startTime ? Date.now() - startTime : undefined;
+
+    const dataKeys = response.data && typeof response.data === 'object' ? Object.keys(response.data) : [];
+    console.log(`[${getLogTimestamp()}][API_RES] [Jules] ${response.status} ${response.statusText} ${method} ${fullUrl} (${durationMs ?? '?'}ms)`, {
+      status: response.status,
+      durationMs,
+      dataKeys,
       data: response.data,
       headers: response.headers,
     });
@@ -49,9 +59,16 @@ julesClient.interceptors.response.use(
     const method = (config.method || 'GET').toUpperCase();
     const fullUrl = `${config.baseURL || ''}${config.url || ''}`;
     const status = error.response ? error.response.status : 'NETWORK_ERR';
-    console.error(`[${getLogTimestamp()}][API_ERR] [Jules] ${status} ${method} ${fullUrl}`, {
+    const startTime = (config as any).meta?.requestStartTime;
+    const durationMs = startTime ? Date.now() - startTime : undefined;
+
+    console.error(`[${getLogTimestamp()}][API_ERR] [Jules] ${status} ${method} ${fullUrl} (${durationMs ?? '?'}ms)`, {
+      status,
+      durationMs,
       message: error.message,
+      code: error.code,
       responseData: error.response?.data,
+      responseHeaders: error.response?.headers,
       error,
     });
     return Promise.reject(error);
