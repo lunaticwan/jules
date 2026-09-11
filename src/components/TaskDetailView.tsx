@@ -3,7 +3,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { ArrowLeft, ExternalLink, Send, CheckCircle2, Bot, User, Check, GitPullRequest, FileText, MessageSquare, GitBranch, Globe, Copy } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Send, CheckCircle2, Bot, User, Check, GitPullRequest, FileText, MessageSquare, GitBranch, Globe, Copy, Info } from 'lucide-react';
+import { useUserRepositoriesQuery } from '../hooks/useGitHubQueries';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { ScrollArea } from './ui/ScrollArea';
@@ -30,7 +31,8 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
   const [actionError, setActionError] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const { data: detailSession, isLoading: isDetailLoading } = useJulesSessionDetailQuery(initialSession?.id);
+  const { data: userRepos = [] } = useUserRepositoriesQuery();
+  const { data: detailSession, isLoading: isDetailLoading } = useJulesSessionDetailQuery(initialSession?.id, userRepos);
   const session = detailSession || initialSession;
 
   const approvePlanMutation = useApproveJulesPlanMutation();
@@ -272,8 +274,20 @@ export const TaskDetailView: React.FC<TaskDetailViewProps> = ({
               </div>
             )}
 
-            {/* Timeline Messages */}
-            <div className="space-y-3 pt-2">
+            {/* Timeline Messages Notice & Items */}
+            {messages.length === 1 && (
+              <div className="flex items-start gap-2 p-2.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-900/50 text-xs text-blue-700 dark:text-blue-300">
+                <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="leading-normal">
+                  <p className="font-semibold">대화 세부 기록 안내</p>
+                  <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-0.5">
+                    Google Jules API v1alpha 세션 응답 특성상, 세부 활동 기록(`activities`/`messages`)이 반환되지 않는 세션의 경우 초기 요청 프롬프트만 표시됩니다.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-3 pt-1">
               {messages.length === 0 ? (
                 <div className="text-center py-8 text-xs text-slate-500">
                   타임라인 메시지가 없습니다.

@@ -60,7 +60,11 @@ const INVALID_OWNER_NAMES = new Set([
 /**
  * 단일 세션 데이터 검증 및 보정 파서
  */
-export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'): JulesSession {
+export function safeParseJulesSession(
+  data: unknown,
+  fallbackId = 'sess-unknown',
+  knownRepos: string[] = []
+): JulesSession {
   const timestamp = getLogTimestamp();
   const rawObj = typeof data === 'object' && data !== null ? (data as Record<string, any>) : {};
   const rawKeys = Object.keys(rawObj);
@@ -87,7 +91,7 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
     rawObj.outputs?.prNumber;
 
   // 텍스트(prompt/title)에서 PR URL 및 번호 추론
-  const fullTextContext = `${prompt} ${rawObj.title || ''} ${JSON.stringify(rawObj.outputs || {})}`;
+  const fullTextContext = `${prompt} ${rawObj.title || ''} ${rawObj.prompt || ''} ${JSON.stringify(rawObj.outputs || {})}`;
   if (!prUrl) {
     const prMatch = fullTextContext.match(/https?:\/\/github\.com\/[^\/\s]+\/[^\/\s]+\/pull\/(\d+)/i);
     if (prMatch) {
@@ -111,7 +115,7 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
       ''
   );
 
-  // repository 필드가 누락되었거나 'owner/repository' / 'unknown/repository'인 경우 정규식 추론
+  // repository 필드가 누락되었거나 'owner/repository' / 'unknown/repository'인 경우 정규식 및 알려진 저장소 매칭 추론
   if (!repo || repo === 'owner/repository' || repo === 'unknown/repository' || !repo.includes('/')) {
     const candidateUrls = [
       prUrl,
@@ -136,19 +140,41 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
       }
     }
 
-    // 텍스트(prompt/title) 내에서 owner/repo 정규식 패턴 검색
+    // 1차: knownRepos (사용자의 실제 GitHub 저장소 목록)에 존재하는지 fullTextContext와 완전 대조
+    if ((!repo || repo === 'owner/repository' || repo === 'unknown/repository') && knownRepos.length > 0) {
+      const lowerContext = fullTextContext.toLowerCase();
+      for (const known of knownRepos) {
+        if (known) {
+          const lowerKnown = known.toLowerCase();
+          const repoOnly = lowerKnown.includes('/') ? lowerKnown.split('/')[1] : lowerKnown;
+          if (lowerContext.includes(lowerKnown) || (repoOnly && lowerContext.includes(repoOnly))) {
+            repo = known;
+            break;
+          }
+        }
+      }
+    }
+
+    // 2차: 알려진 레포 매칭 실패 시 텍스트(prompt/title) 내에서 owner/repo 정규식 패턴 검색
     if (!repo || repo === 'owner/repository' || repo === 'unknown/repository') {
-      const textRepoMatch = fullTextContext.match(/([a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+)/);
-      if (textRepoMatch && textRepoMatch[1] && textRepoMatch[1].includes('/') && !textRepoMatch[1].startsWith('http')) {
-        const candidateStr = textRepoMatch[1];
-        const [o, r] = candidateStr.split('/');
-        if (
-          o &&
-          r &&
-          !NON_REPO_TERMS.has(candidateStr.toLowerCase()) &&
-          !INVALID_OWNER_NAMES.has(o.toLowerCase())
-        ) {
-          repo = `${o}/${r.replace(/\.git$/, '')}`;
+      const textMatches = fullTextContext.matchAll(/([a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+)/g);
+      for (const textRepoMatch of textMatches) {
+        if (textRepoMatch && textRepoMatch[1] && textRepoMatch[1].includes('/') && !textRepoMatch[1].startsWith('http')) {
+          const candidateStr = textRepoMatch[1];
+          const [o, r] = candidateStr.split('/');
+          if (
+            o &&
+            r &&
+            !NON_REPO_TERMS.has(candidateStr.toLowerCase()) &&
+            !INVALID_OWNER_NAMES.has(o.toLowerCase())
+          ) {
+            // io/roulette 등 host/repo 또는 도메인 접두사 오추론 방지
+            if (o.toLowerCase() === 'io' || o.toLowerCase() === 'com' || o.toLowerCase() === 'org' || o.toLowerCase() === 'net') {
+              continue;
+            }
+            repo = `${o}/${r.replace(/\.git$/, '')}`;
+            break;
+          }
         }
       }
     }
@@ -166,55 +192,88 @@ export function safeParseJulesSession(data: unknown, fallbackId = 'sess-unknown'
     repo = '(저장소 정보 미수신)';
   }
 
-  // Jules API activities / outputs / history / steps / messages 필드 통합 파싱
+  // Jules API activities / outputs / history / steps / turns / timeline / events / messages 필드 다각도 통합 파싱
   let parsedMessages: JulesMessage[] = [];
   let msgSource = 'fallback';
+
+  const extractSender = (obj: any): JulesMessage['sender'] => {
+    if (!obj) return 'jules';
+    const actor = String(obj.actor || obj.sender || obj.role || obj.author || '').toLowerCase();
+    if (actor === 'user' || actor === 'human' || actor === 'client') return 'user';
+    if (actor === 'system') return 'system';
+    return 'jules';
+  };
+
+  const extractContent = (obj: any): string => {
+    if (!obj) return '';
+    if (typeof obj === 'string') return obj;
+    return String(
+      obj.content ||
+        obj.message ||
+        obj.text ||
+        obj.description ||
+        obj.summary ||
+        obj.response ||
+        obj.userQuery ||
+        obj.detail ||
+        ''
+    );
+  };
 
   if (Array.isArray(rawObj.messages) && rawObj.messages.length > 0) {
     msgSource = 'messages';
     parsedMessages = rawObj.messages.map((m: any, i: number) => ({
       id: String(m.id || `msg-${i}`),
-      sender: (['user', 'jules', 'system'].includes(m.sender) ? m.sender : 'jules') as JulesMessage['sender'],
-      content: String(m.content || m.text || ''),
-      timestamp: String(m.timestamp || m.createTime || new Date().toISOString()),
+      sender: extractSender(m),
+      content: extractContent(m),
+      timestamp: String(m.timestamp || m.createTime || m.createdAt || new Date().toISOString()),
       type: m.type,
     }));
   } else if (Array.isArray(rawObj.activities) && rawObj.activities.length > 0) {
     msgSource = 'activities';
-    parsedMessages = rawObj.activities.map((act: any, i: number) => {
-      const isUser = act.actor === 'USER' || act.sender === 'USER' || act.sender === 'user' || act.role === 'user';
-      return {
-        id: String(act.id || `act-${i}`),
-        sender: (isUser ? 'user' : 'jules') as JulesMessage['sender'],
-        content: String(act.message || act.content || act.description || act.summary || act.text || ''),
-        timestamp: String(act.createTime || act.timestamp || new Date().toISOString()),
-        type: act.type || 'text',
-      };
-    });
+    parsedMessages = rawObj.activities.map((act: any, i: number) => ({
+      id: String(act.id || `act-${i}`),
+      sender: extractSender(act),
+      content: extractContent(act),
+      timestamp: String(act.createTime || act.timestamp || act.createdAt || new Date().toISOString()),
+      type: act.type || 'text',
+    }));
   } else if (Array.isArray(rawObj.history) && rawObj.history.length > 0) {
     msgSource = 'history';
-    parsedMessages = rawObj.history.map((h: any, i: number) => {
-      const isUser = h.role === 'user' || h.sender === 'user' || h.actor === 'USER';
-      return {
-        id: String(h.id || `hist-${i}`),
-        sender: (isUser ? 'user' : 'jules') as JulesMessage['sender'],
-        content: String(h.content || h.message || h.text || ''),
-        timestamp: String(h.timestamp || h.createTime || new Date().toISOString()),
-        type: h.type || 'text',
-      };
-    });
+    parsedMessages = rawObj.history.map((h: any, i: number) => ({
+      id: String(h.id || `hist-${i}`),
+      sender: extractSender(h),
+      content: extractContent(h),
+      timestamp: String(h.timestamp || h.createTime || h.createdAt || new Date().toISOString()),
+      type: h.type || 'text',
+    }));
   } else if (Array.isArray(rawObj.turns) && rawObj.turns.length > 0) {
     msgSource = 'turns';
-    parsedMessages = rawObj.turns.map((t: any, i: number) => {
-      const isUser = t.role === 'user' || t.userQuery;
-      return {
-        id: String(t.id || `turn-${i}`),
-        sender: (isUser ? 'user' : 'jules') as JulesMessage['sender'],
-        content: String(t.content || t.userQuery || t.response || ''),
-        timestamp: String(t.timestamp || new Date().toISOString()),
-        type: 'text',
-      };
-    });
+    parsedMessages = rawObj.turns.map((t: any, i: number) => ({
+      id: String(t.id || `turn-${i}`),
+      sender: extractSender(t),
+      content: extractContent(t),
+      timestamp: String(t.timestamp || t.createTime || new Date().toISOString()),
+      type: 'text',
+    }));
+  } else if (Array.isArray(rawObj.timeline) && rawObj.timeline.length > 0) {
+    msgSource = 'timeline';
+    parsedMessages = rawObj.timeline.map((item: any, i: number) => ({
+      id: String(item.id || `time-${i}`),
+      sender: extractSender(item),
+      content: extractContent(item),
+      timestamp: String(item.timestamp || item.createTime || new Date().toISOString()),
+      type: item.type || 'text',
+    }));
+  } else if (Array.isArray(rawObj.events) && rawObj.events.length > 0) {
+    msgSource = 'events';
+    parsedMessages = rawObj.events.map((ev: any, i: number) => ({
+      id: String(ev.id || `ev-${i}`),
+      sender: extractSender(ev),
+      content: extractContent(ev),
+      timestamp: String(ev.timestamp || ev.createTime || new Date().toISOString()),
+      type: 'text',
+    }));
   }
 
   if (parsedMessages.length === 0) {
@@ -457,7 +516,7 @@ let inMemorySessionsCache: JulesSession[] | null = null;
 /**
  * 로컬 캐시/LocalStorage에 저장된 세션 목록을 반환함
  */
-export function getStoredSessions(): JulesSession[] {
+export function getStoredSessions(knownRepos: string[] = []): JulesSession[] {
   let list: JulesSession[] = [];
   try {
     const data = localStorage.getItem(STORAGE_KEYS.MOCK_SESSIONS);
@@ -482,7 +541,7 @@ export function getStoredSessions(): JulesSession[] {
   }
 
   console.log(`[${getLogTimestamp()}][getStoredSessions] [COUNT: ${list.length}] cacheExists: ${!!inMemorySessionsCache}`);
-  return list.map((s, index) => safeParseJulesSession(s, `sess-${index + 101}`));
+  return list.map((s, index) => safeParseJulesSession(s, `sess-${index + 101}`, knownRepos));
 }
 
 /**
@@ -501,11 +560,11 @@ export function saveStoredSessions(sessions: JulesSession[]): void {
 /**
  * Jules 세션 목록을 API에서 조회하고 미연동 시 로컬 캐시 데이터를 반환함
  */
-export async function fetchJulesSessions(): Promise<JulesSession[]> {
+export async function fetchJulesSessions(knownRepos: string[] = []): Promise<JulesSession[]> {
   const apiKey = getJulesApiKey();
   console.log(`[${getLogTimestamp()}][fetchJulesSessions] [START] apiKeyPresent: ${!!apiKey}`);
   if (!apiKey) {
-    const stored = getStoredSessions();
+    const stored = getStoredSessions(knownRepos);
     console.log(`[${getLogTimestamp()}][fetchJulesSessions] [NO_KEY_FALLBACK]`, stored);
     return stored;
   }
@@ -516,7 +575,7 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
     console.log(`[${getLogTimestamp()}][fetchJulesSessions] [HTTP_SUCCESS] status: ${response.status}`);
     const data = response.data;
     if (Array.isArray(data.sessions)) {
-      const mapped = data.sessions.map((s: any, index: number) => safeParseJulesSession(s, `session-${index}`));
+      const mapped = data.sessions.map((s: any, index: number) => safeParseJulesSession(s, `session-${index}`, knownRepos));
       console.log(`[${getLogTimestamp()}][fetchJulesSessions] [MAPPED_SESSIONS_COUNT: ${mapped.length}]`, mapped);
       saveStoredSessions(mapped);
       return mapped;
@@ -525,7 +584,7 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
     console.error(`[${getLogTimestamp()}][fetchJulesSessions] [API_ERROR]`, err?.response?.status, err?.message, err?.response?.data || err);
   }
 
-  const fallback = getStoredSessions();
+  const fallback = getStoredSessions(knownRepos);
   console.log(`[${getLogTimestamp()}][fetchJulesSessions] [FALLBACK_STORED_SESSIONS]`, fallback);
   return fallback;
 }
@@ -533,7 +592,10 @@ export async function fetchJulesSessions(): Promise<JulesSession[]> {
 /**
  * 특정 Jules 세션의 상세 정보를 조회함
  */
-export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesSession | null> {
+export async function fetchJulesSessionDetail(
+  sessionId: string,
+  knownRepos: string[] = []
+): Promise<JulesSession | null> {
   const apiKey = getJulesApiKey();
   console.log(`[${getLogTimestamp()}][fetchJulesSessionDetail] [START] sessionId: ${sessionId}, apiKeyPresent: ${!!apiKey}`);
   const cleanId = sessionId.startsWith('sessions/') ? sessionId.replace(/^sessions\//, '') : sessionId;
@@ -544,14 +606,14 @@ export async function fetchJulesSessionDetail(sessionId: string): Promise<JulesS
       const response = await julesClient.get(`/sessions/${cleanId}`);
       console.log(`[${getLogTimestamp()}][fetchJulesSessionDetail] [HTTP_SUCCESS] status: ${response.status}`);
       if (response.data) {
-        return safeParseJulesSession(response.data, cleanId);
+        return safeParseJulesSession(response.data, cleanId, knownRepos);
       }
     } catch (err: any) {
       console.error(`[${getLogTimestamp()}][fetchJulesSessionDetail] [API_ERROR]`, err?.response?.status, err?.message, err?.response?.data || err);
     }
   }
 
-  const sessions = getStoredSessions();
+  const sessions = getStoredSessions(knownRepos);
   const found = sessions.find(
     (s) => s.id === sessionId || s.id === cleanId || s.name === sessionId || s.name === `sessions/${cleanId}`
   );

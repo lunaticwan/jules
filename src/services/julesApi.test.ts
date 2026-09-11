@@ -104,18 +104,51 @@ describe('Jules API Data Mapping & Cache Test', () => {
     expect(parsed.id).toBe('12365064714472776148');
   });
 
-  it('safeParseJulesSession() - does not misidentify "UI/UX" in prompt as repository name', async () => {
+  it('safeParseJulesSession() - matches knownRepos correctly and avoids domain/path misidentification', async () => {
     const { safeParseJulesSession } = await import('./julesApi');
 
+    const knownRepos = ['lunaticwan/roulette', 'lunaticwan/actions-checkout', 'lunaticwan/jules'];
+
+    // 1. Prompt has 'Navigated to https://lunaticwan.github.io/roulette'
+    const rawDataRoulette = {
+      id: 'sessions/14528529343130375316',
+      title: '룰렛 웹 앱 초기화 콘솔 로그 분석',
+      prompt: 'Navigated to https://lunaticwan.github.io/roulette ... 화면 진입 시 콘솔로그.',
+    };
+
+    const parsedRoulette = safeParseJulesSession(rawDataRoulette, 'sess-1', knownRepos);
+    expect(parsedRoulette.repository).toBe('lunaticwan/roulette');
+
+    // 2. Prompt with UI/UX without matching knownRepos
     const rawDataWithUiUxTitle = {
       id: 'sessions/10337981166895172531',
       title: '사전 서비스 UI/UX 개선 및 언어팩 고도화',
       createTime: '2026-09-11T01:43:55Z',
     };
 
-    const parsed = safeParseJulesSession(rawDataWithUiUxTitle);
-    expect(parsed.repository).toBe('(저장소 정보 미수신)');
-    expect(parsed.repository).not.toBe('UI/UX');
+    const parsedUiUx = safeParseJulesSession(rawDataWithUiUxTitle, 'sess-2', knownRepos);
+    expect(parsedUiUx.repository).toBe('(저장소 정보 미수신)');
+    expect(parsedUiUx.repository).not.toBe('UI/UX');
+  });
+
+  it('safeParseJulesSession() - parses timeline and events arrays correctly', async () => {
+    const { safeParseJulesSession } = await import('./julesApi');
+
+    const rawDataTimeline = {
+      id: 'sess-timeline-1',
+      title: 'Timeline Session',
+      timeline: [
+        { id: 't1', role: 'user', content: 'User Timeline Msg' },
+        { id: 't2', role: 'assistant', text: 'Assistant Timeline Resp' },
+      ],
+    };
+
+    const parsedTimeline = safeParseJulesSession(rawDataTimeline);
+    expect(parsedTimeline.messages.length).toBe(2);
+    expect(parsedTimeline.messages[0].sender).toBe('user');
+    expect(parsedTimeline.messages[0].content).toBe('User Timeline Msg');
+    expect(parsedTimeline.messages[1].sender).toBe('jules');
+    expect(parsedTimeline.messages[1].content).toBe('Assistant Timeline Resp');
   });
 
   it('safeParseJulesSession() - parses history and PR URL in prompt text', async () => {
